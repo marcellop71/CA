@@ -286,27 +286,50 @@ for single-declaration lookups.
 
 ## Building
 
-Requires OpenSSL dev headers (for SHA-256 FFI). Redis is only needed for
-the `fetch` and `address` CLI commands — the library and registry
-attributes work without it.
+The default target is the `CA` library. Redis is only needed for the
+`ca` CLI executable (`fetch` and `address` subcommands).
+
+### With Nix (recommended, any platform)
 
 ```bash
-# Install OpenSSL dev headers (Ubuntu/Debian)
+nix develop    # enter the dev shell (or use direnv with the included .envrc)
+lake build     # build the CA library
+lake build ca  # build the CLI executable (requires Redis native libs)
+```
+
+The Nix flake provides Lean 4, OpenSSL, hiredis, and all other native
+dependencies. Works on Linux and macOS.
+
+### Without Nix (Ubuntu/Debian)
+
+```bash
+# Install OpenSSL dev headers
 sudo apt install libssl-dev
 
-# Build
+# Build the library
 lake update
 lake build
+
+# Build the CLI (also needs hiredis)
+sudo apt install libhiredis-dev
+lake build ca
 ```
+
+### Build targets
+
+| Command | What it builds | Native deps required |
+|---------|---------------|---------------------|
+| `lake build` | `CA` library (default) | OpenSSL (`libssl`, `libcrypto`) |
+| `lake build ca` | CLI executable | OpenSSL + hiredis |
 
 ## Dependencies
 
-| Dependency | Purpose |
-|---|---|
-| [lean4-cli](https://github.com/leanprover/lean4-cli) | CLI argument parsing |
-| [redis-lean](https://github.com/marcellop71/redis-lean) | Redis FFI (hiredis) for `fetch`/`address` commands |
-| [batteries](https://github.com/leanprover-community/batteries) | `NameMapExtension` for registry attributes |
-| OpenSSL (`libssl`, `libcrypto`) | SHA-256 via EVP API (C FFI) |
+| Dependency | Required for | Purpose |
+|---|---|---|
+| [batteries](https://github.com/leanprover-community/batteries) | library | `NameMapExtension` for registry attributes |
+| OpenSSL (`libssl`, `libcrypto`) | library | SHA-256 via EVP API (C FFI) |
+| [lean4-cli](https://github.com/leanprover/lean4-cli) | CLI only | CLI argument parsing |
+| [redis-lean](https://github.com/marcellop71/redis-lean) | CLI only | Redis FFI (hiredis) for `fetch`/`address` commands |
 
 Lean toolchain: `leanprover/lean4:v4.29.0-rc1`
 
@@ -316,6 +339,8 @@ Lean toolchain: `leanprover/lean4:v4.29.0-rc1`
 CA/
 ├── lakefile.lean                  # package config, FFI build targets
 ├── lean-toolchain
+├── flake.nix                      # Nix dev shell (Lean + native deps)
+├── .envrc                         # direnv integration
 ├── CA.lean                        # re-exports all modules
 ├── CA/
 │   ├── Canonical.lean             # L0/L1 canonicalization
