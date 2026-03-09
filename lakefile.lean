@@ -2,22 +2,24 @@ import Lake
 open System Lake DSL
 
 package "ca" where
-  moreLinkArgs := #["-lssl", "-lcrypto"]
+  moreLinkArgs := #["-Wl,--allow-shlib-undefined", "-lssl", "-lcrypto"]
 
 require batteries from git
   "https://github.com/leanprover-community/batteries" @ "v4.29.0-rc1"
+
+require Cli from git
+  "https://github.com/leanprover/lean4-cli" @ "main"
+
+require redisLean from git
+  "https://github.com/marcellop71/redis-lean" @ "main"
 
 @[default_target]
 lean_lib CA where
   extraDepTargets := #[`libsha256_shim]
 
--- The `ca` CLI executable (Main.lean) requires additional dependencies:
---   require Cli from git "https://github.com/leanprover/lean4-cli" @ "main"
---   require redisLean from git "https://github.com/marcellop71/redis-lean" @ "main"
--- Add these to your lakefile and uncomment the target below to build it.
--- lean_exe "ca" where
---   root := `Main
---   moreLinkArgs := #["-lhiredis", "-lhiredis_ssl"]
+lean_exe "ca" where
+  root := `Main
+  moreLinkArgs := #["-lhiredis", "-lhiredis_ssl"]
 
 target sha256_shim_o pkg : FilePath := do
   let oFile := pkg.buildDir / "c" / "sha256_shim.o"

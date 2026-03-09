@@ -42,10 +42,13 @@
         # Library path variable name (different on Darwin vs Linux)
         libPathVar = if pkgs.stdenv.isDarwin then "DYLD_LIBRARY_PATH" else "LD_LIBRARY_PATH";
 
-        # Native C dependencies (only openssl for sha256_shim.c FFI)
+        # Native C dependencies for CA library and CLI
         nativeDeps = [
-          pkgs.openssl
-          pkgs.gmp
+          pkgs.openssl    # sha256_shim.c FFI + linking (-lssl -lcrypto)
+          pkgs.hiredis    # redis-lean linking (-lhiredis -lhiredis_ssl)
+          pkgs.zlog       # zlog-lean linking (-lzlog)
+          pkgs.arrow-cpp  # arrow-lean FFI
+          pkgs.gmp        # Lean runtime
         ];
 
       in {
@@ -58,7 +61,12 @@
           ];
 
           LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeDeps;
-          C_INCLUDE_PATH = "${pkgs.openssl.dev}/include";
+          C_INCLUDE_PATH = pkgs.lib.makeSearchPath "include" [
+            pkgs.openssl.dev
+            pkgs.hiredis
+            pkgs.zlog
+          ];
+          CPLUS_INCLUDE_PATH = "${pkgs.arrow-cpp}/include";
 
           shellHook = ''
             export ${libPathVar}="${pkgs.lib.makeLibraryPath nativeDeps}"
