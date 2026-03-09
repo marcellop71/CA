@@ -11,7 +11,7 @@ require Cli from git
   "https://github.com/leanprover/lean4-cli" @ "main"
 
 require redisLean from git
-  "git@github.com:marcellop71/redis-lean.git" @ "main"
+  "https://github.com/marcellop71/redis-lean.git" @ "main"
 
 require batteries from git
   "https://github.com/leanprover-community/batteries" @ "v4.29.0-rc1"
