@@ -1,0 +1,704 @@
+\documentclass[11pt]{article}
+
+\usepackage{fontspec}
+\usepackage[margin=1in]{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+
+% Lean listing style
+\definecolor{leanKeyword}{RGB}{0,0,180}
+\definecolor{leanComment}{RGB}{100,100,100}
+\definecolor{leanString}{RGB}{0,120,0}
+\definecolor{leanOutput}{RGB}{60,60,60}
+\definecolor{codebg}{RGB}{248,248,248}
+
+\lstdefinelanguage{Lean}{
+  morekeywords={import,open,namespace,end,def,theorem,example,syntax,
+    let,match,return,try,catch,do,if,then,else,fun,where,with,
+    partial,private,structure,deriving,in,for,mut,section,
+    attribute,initialize},
+  morekeywords=[2]{use,resolve},
+  keywordstyle=\color{leanKeyword}\bfseries,
+  keywordstyle=[2]\color{leanKeyword}\bfseries,
+  sensitive=true,
+  morecomment=[l]{--},
+  morecomment=[n]{/-}{-/},
+  commentstyle=\color{leanComment}\itshape,
+  morestring=[b]",
+  stringstyle=\color{leanString},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  showstringspaces=false,
+}
+
+\lstset{
+  language=Lean,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{black!20},
+  xleftmargin=2em,
+  framexleftmargin=1.5em,
+  numbers=left,
+  numberstyle=\tiny\color{black!40},
+  numbersep=8pt,
+  aboveskip=1em,
+  belowskip=1em,
+}
+
+% Output style (no line numbers, gray frame)
+\lstdefinestyle{output}{
+  language={},
+  basicstyle=\ttfamily\small\color{leanOutput},
+  frame=single,
+  rulecolor=\color{black!15},
+  backgroundcolor=\color{white},
+  numbers=none,
+  xleftmargin=2em,
+  framexleftmargin=0em,
+}
+
+% Pseudocode style
+\lstdefinestyle{pseudo}{
+  language={},
+  basicstyle=\ttfamily\small,
+  frame=single,
+  rulecolor=\color{black!20},
+  backgroundcolor=\color{codebg},
+  numbers=none,
+  xleftmargin=2em,
+  framexleftmargin=0em,
+}
+
+\title{\textbf{(Content)-Addressing Formal Results}\\[4pt]
+  \large A Working Prototype in Lean\,4}
+\author{Marcello Paris\\\small\texttt{marcello.paris@gmail.com}}
+\date{March 2026}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\bigskip
+
+
+% ====================================================================
+\section{Overview}
+% ====================================================================
+
+Today, a theorem's identity is its \textbf{name}~--- a human-chosen path
+like \texttt{Finset.sum\_comm}. To refer to it, three coordinates are
+mandatory: the project that hosts it, the file to import, and the
+namespace path. This creates fragile coupling: when a library renames,
+reorganizes, or moves declarations, all downstream code breaks~--- even
+though the mathematics hasn't changed.
+
+The problem compounds across the ecosystem. Projects outside Mathlib have
+no standardized way to refer to \emph{each other}~--- only project-local
+names tied to project-local file structures.
+
+The underlying issue is conceptual: \textbf{one should import a result, not
+a file.} What matters is the mathematical content~--- the statement
+itself. An addressing scheme should reflect this.
+
+
+% ====================================================================
+\subsection{The Proposal}
+% ====================================================================
+
+Build a \textbf{global address space} for formal declarations~--- a
+universal scheme where each theorem has a unique, project-independent
+identifier derived from its mathematical content.
+
+\textbf{Content-addressing}~--- hashing the normalized type expression~---
+is a natural approach: the address is intrinsic to the mathematics,
+requires no central authority, and scales to a decentralized ecosystem.
+Existing fully qualified names serve as aliases into this address space;
+nothing breaks.
+
+The core question is how much normalization to apply before hashing.
+The more we normalize, the more equivalent formulations collapse to the
+same address. The prototype implements two levels (de~Bruijn normalization
+and reducible-transparency reduction), with full definitional equality
+remaining an open question (Section~\ref{sec:canon}).
+
+For theorems, Lean's proof irrelevance guarantees that the address
+identifies the \emph{statement} regardless of which proof witnesses it.
+
+The value of a stable addressing scheme does not depend on achieving
+full content-based identity. Even partial normalization is a meaningful
+improvement toward decentralized contribution, cross-project
+discoverability, and improved readability of formal mathematics.
+
+
+% ====================================================================
+\subsection{What This Enables}
+% ====================================================================
+
+\begin{itemize}
+  \item \textbf{Stability}~--- Addresses are immune to upstream refactors.
+    Renames, file moves, and namespace changes do not affect the address.
+
+  \item \textbf{Universal reference}~--- An address works without context:
+    no project, file, or import required. Self-authenticating~--- anyone
+    can verify by re-hashing. Resolution is by name (not raw hash),
+    because names carry metadata~--- attributes, instance
+    registrations~--- that the hash alone cannot disambiguate
+    (Section~\ref{sec:equiv}).
+
+  \item \textbf{Cross-project discoverability}~--- A shared key space
+    across the entire ecosystem. Proof search tools and AI provers index
+    everything structurally, by type.
+
+  \item \textbf{Decentralized formal mathematics}~--- Identity is content
+    rather than location. Different projects contribute to a shared DAG
+    without central coordination (Section~\ref{sec:registry}).
+\end{itemize}
+
+In dependent type theory, a type is a specification and a term of that type
+is a program. Content-addressing extends beyond mathematics to API
+contracts, protocol invariants, and smart contract properties.
+
+
+% ====================================================================
+\subsection{Looking For}
+% ====================================================================
+
+We have a working prototype with two normalization levels, two hashing
+modes, and elaboration-time resolution. We are looking for guidance on:
+
+\begin{itemize}
+  \item \textbf{Content-addressing techniques}~--- What are the best
+    normalization strategies for Lean's type theory? How far can
+    reduction-based normalization go, and where are the fundamental limits?
+
+  \item \textbf{Integration into Lean's toolchain}~--- At which phase of
+    elaboration should resolution happen? What is the best way to hook into
+    name resolution so that implicit mode is robust and efficient?
+\end{itemize}
+
+
+% ====================================================================
+\section{Decentralized Registry}
+\label{sec:registry}
+% ====================================================================
+
+Content addresses give every declaration a stable, location-independent
+identity. The registry organizes the mutable state~--- who proved what,
+what is open, what is conditional~--- around this immutable core.
+
+
+% --------------------------------------------------------------------
+\subsection{Design}
+% --------------------------------------------------------------------
+
+Every formalization of mathematics in Lean already lives in a git
+repository.  The decentralized registry exploits this fact directly:
+each participating project hosts a \texttt{registry/} folder in its own
+repo, and the global registry is simply the union of all such folders.
+No additional infrastructure is needed~--- no IPFS, no blockchain, no
+central server.
+
+This simplicity is possible because \textbf{consensus is trivial}.
+Unlike distributed systems that must agree on ordering or resolve
+conflicts, a mathematical registry has a monotonic truth condition: a
+proposition is proved if \emph{any} repository contains a valid proof.
+Proofs cannot be retracted~--- once proved, always proved.  Two
+repositories proving the same proposition under different names is not a
+conflict; it is redundancy, and the content address shows they state the
+same fact.  There is nothing to vote on, no quorum to reach.
+
+\begin{itemize}
+  \item \textbf{Publication} is \texttt{git push}~--- a project
+    generates its \texttt{registry/} folder, commits it, and pushes.
+  \item \textbf{Verification} is \texttt{lake build}~--- Lean's kernel
+    type-checks the proofs.  Anyone can clone the source and verify
+    independently.
+  \item \textbf{Consensus} is trivial: one valid proof is enough.
+  \item \textbf{Discovery} is a curated list of known repositories
+    (Section~\ref{sec:sources}).
+\end{itemize}
+
+Two properties of content-addressing make this work:
+\emph{determinism}~--- the same mathematical content always produces the
+same address, regardless of who computes it~--- and \emph{monotonic
+consensus}~--- one proof suffices and can never be invalidated.
+
+
+% --------------------------------------------------------------------
+\subsection{Attributes}
+\label{sec:attributes}
+% --------------------------------------------------------------------
+
+Authors annotate their code with two attributes provided by the
+\texttt{CA.Registry} module:
+
+\paragraph{\texttt{@[open\_point]}} marks a \texttt{def X : Prop} as an
+open problem. Must be a definition with type \texttt{Prop}~--- applying it
+to a theorem or non-Prop definition is a compile-time error.
+
+\begin{lstlisting}[caption={Declaring an open problem}]
+import CA
+
+@[open_point "Bertrand's postulate, elementary form"]
+def BertrandPostulate : Prop :=
+  forall n : Nat, n >= 1 -> exists p, Nat.Prime p /\ n < p /\ p < 2 * n
+\end{lstlisting}
+
+\paragraph{\texttt{@[publish]}} marks any declaration for publication to
+the registry.
+
+\begin{lstlisting}[caption={Publishing a conditional theorem}]
+@[publish "Consequence of Bertrand's postulate"]
+theorem prime_between (n : Nat) (h : BertrandPostulate) (hn : n >= 1) :
+    exists p, Nat.Prime p /\ n < p /\ p < 2 * n :=
+  h n hn
+\end{lstlisting}
+
+Both attributes support retroactive application from a separate file,
+allowing annotation of existing code or upstream dependencies without
+modifying the original source:
+
+\begin{lstlisting}[caption={Retroactive annotation of existing declarations}]
+import CA
+import MyProject.Theorems
+
+-- Annotate declarations defined elsewhere
+attribute [open_point "My conjecture"] MyProject.SomeConjecture
+attribute [publish "Key lemma"]        MyProject.some_lemma
+\end{lstlisting}
+
+This is useful for library authors who want to publish declarations from
+upstream dependencies, or for a dedicated registry file that aggregates
+annotations without touching the original source.
+
+
+% --------------------------------------------------------------------
+\subsection{Declaration Status}
+\label{sec:status}
+% --------------------------------------------------------------------
+
+Status is computed automatically from the environment:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  \textbf{Pattern} & \textbf{Status} & \textbf{Rule} \\
+  \midrule
+  \texttt{theorem foo : P := proof} & proved & Type-checks, no \texttt{sorry} \\
+  \texttt{def P : Prop} with \texttt{@[open\_point]} & open & Explicitly marked \\
+  \texttt{def P : Prop} with no proof & open & Stated, no proof exists \\
+  \texttt{theorem bar (h : OpenP) : Q} & conditional & Proved modulo open hypotheses \\
+  \bottomrule
+\end{tabular}
+\caption{Automatic status classification.}
+\end{table}
+
+For conditional declarations, the registry records which open addresses
+are required~--- the declarations whose proof would promote the entry from
+conditional to proved.
+
+
+% --------------------------------------------------------------------
+\subsection{Registry Folder}
+\label{sec:folder}
+% --------------------------------------------------------------------
+
+The \texttt{registry/} folder is created and maintained locally inside
+each project.  The \texttt{ca registry} CLI command, typically run as a
+post-build step after \texttt{lake build}, loads the compiled
+environment, collects declarations annotated with \texttt{@[publish]} or
+\texttt{@[open\_point]}, computes content addresses, classifies status,
+and writes two files:
+
+\begin{lstlisting}[style=pseudo,caption={Generating the registry folder}]
+lake build                                      -- compile the project
+lake exe ca registry -m MyProject               -- generate registry/
+lake exe ca registry -m MyProject --level 1     -- with L1 normalization
+\end{lstlisting}
+
+\texttt{registry/meta.json}~--- project-level metadata (hash level,
+open/proved/conditional counts).
+
+\texttt{registry/declarations.json}~--- the append-only manifest. Each
+entry contains the content address, name, module, kind, status,
+pretty-printed type, and type dependencies.
+
+Entries are never removed. Status updates (open $\to$ proved) are
+reflected by updating the status field in place; git history provides the
+audit trail.
+
+
+% --------------------------------------------------------------------
+\subsection{Status Cascade}
+\label{sec:cascade}
+% --------------------------------------------------------------------
+
+When a proof is submitted for an open point, conditional declarations
+downstream may become unconditional:
+
+\begin{enumerate}
+  \item A previously open address acquires a proof~--- status becomes
+    \texttt{proved}.
+  \item All \texttt{conditional} entries whose open dependencies included
+    the newly proved address are re-evaluated.
+  \item If all of an entry's open dependencies are now proved, it is
+    promoted to \texttt{proved}.
+  \item This cascades transitively.
+\end{enumerate}
+
+Cross-project cascades emerge when a consumer merges multiple registries:
+an open point in project~A may be proved in project~B, which promotes
+conditional entries in project~C. No coordination between A, B, and~C is
+needed.
+
+\paragraph{Impact metric.} The dependency graph makes \emph{impact}
+computable: the impact of an open point is the number of conditional
+declarations transitively downstream of it. Proving a high-impact open
+point cascades to close the most chains.
+
+
+% --------------------------------------------------------------------
+\subsection{Sources and Discovery}
+\label{sec:sources}
+% --------------------------------------------------------------------
+
+Because the registry is fully decentralized~--- each project maintains
+its own \texttt{registry/} folder~--- a discovery mechanism is needed so
+that resolution tools know \emph{where to look}.
+
+The simplest approach is a curated list: a \texttt{sources.json} file
+in the CA repository enumerates known git repositories that host a
+\texttt{registry/} folder.  Each entry contains the repository URL and
+the path to the registry within it.  Resolution tools consult this list
+to fetch and merge registry data from across the ecosystem.
+
+\begin{lstlisting}[style=pseudo,caption={\texttt{sources.json} format}]
+{ "registries": [
+    { "url": "https://github.com/leanprover-community/mathlib4",
+      "registry_path": "registry/" },
+    { "url": "https://github.com/user/my-project",
+      "registry_path": "registry/" }
+  ]
+}
+\end{lstlisting}
+
+Adding a project to the ecosystem is straightforward:
+
+\begin{enumerate}
+  \item Add \texttt{require ca} to the project's \texttt{lakefile.lean}.
+  \item Annotate declarations with \texttt{@[publish]} or
+    \texttt{@[open\_point]}.
+  \item Run \texttt{lake exe ca registry} to generate
+    \texttt{registry/}.
+  \item Commit \texttt{registry/} to git and push.
+  \item Open a PR to add one entry to \texttt{sources.json} in the
+    CA repository.
+\end{enumerate}
+
+Step~5 is the only coordination point.  Everything else is local to the
+project.  The static list is the right starting point; it can later be
+replaced by automatic discovery (e.g.\ a GitHub topic tag) without
+changing the rest of the design.
+
+
+% ====================================================================
+\section{Content-Addressing Pipeline}
+\label{sec:pipeline}
+% ====================================================================
+
+The address of a declaration is computed in three stages:
+canonicalization, serialization, and hashing. The result is a 64-character
+hexadecimal SHA-256 string identifying the declaration's type.
+
+% --------------------------------------------------------------------
+\subsection{Canonicalization}
+\label{sec:canon}
+% --------------------------------------------------------------------
+
+Canonicalization transforms an \texttt{Expr} so that expressions differing
+only in irrelevant ways become identical. Two levels are available.
+
+\paragraph{Level~0 (pure).} Requires no \texttt{MetaM} context. Universe
+parameters are renamed to positional indices (\texttt{u\_0}, \texttt{u\_1},
+\ldots) by first-occurrence order, and \texttt{.mdata} annotations are
+stripped. Lean\,4 uses de~Bruijn indices for bound variables, so
+$\alpha$-equivalence is built in. Binder names do not affect the hash.
+
+\paragraph{Level~1 (MetaM).} Extends Level~0 with reducible-transparency
+normalization via \texttt{deepNormalize}, a recursive normalizer that
+applies \texttt{whnf} at every subexpression under
+\texttt{withTransparency .reducible}:
+
+\begin{lstlisting}[style=pseudo,caption={Deep normalization (pseudocode)}]
+deepNormalize(e, depth):
+  if depth >= 256: return e
+  e <- whnf e    -- native, under reducible transparency
+  match e:
+    .app f a      -> .app (deepNormalize f) (deepNormalize a)
+    .lam n t b bi -> normalize t; open binder with withLocalDecl;
+                     normalize body; re-abstract with mkLambdaFVars
+    .forallE ...  -> same pattern, re-abstract with mkForallFVars
+    .letE _ _ v b -> normalize v; substitute into b; normalize b
+    .mdata _ e    -> deepNormalize e
+    .proj t i e   -> normalize e; whnf the projection again
+    _             -> return e
+\end{lstlisting}
+
+This collapses notation aliases (e.g.\ \texttt{HAdd.hAdd} vs
+\texttt{Add.add}), \texttt{@[reducible]} abbreviations, beta-redexes,
+let-bindings, and reducible projections. Instance arguments
+(\texttt{@[semireducible]}) are \emph{not} unfolded~--- \texttt{Add Nat}
+stays as \texttt{Add Nat}.
+
+On \texttt{Init.Data.Nat.Basic}, the largest equivalence class grows from
+391~members (Level~0) to 467 (Level~1)~--- 76~additional declarations
+collapsed by reducible unfolding.
+
+\paragraph{Level~2 (open question).} Full definitional equality would
+give the same address to all defeq formulations. Lean's dependent type
+theory does not admit unique normal forms for arbitrary definitional
+equality, so this level remains out of reach.
+
+
+% --------------------------------------------------------------------
+\subsection{The \texttt{whnf} Crash and Micro-Batching}
+\label{sec:crash}
+% --------------------------------------------------------------------
+
+Lean's native \texttt{whnf} is implemented in C with no heartbeat checks.
+When it overruns a resource limit, the result is an uncatchable SIGSEGV.
+
+Two failure modes were discovered on Mathlib modules
+(${\sim}58{,}000$ declarations):
+
+\begin{enumerate}
+  \item \textbf{MetaM state accumulation (types).} A single
+    \texttt{MetaM} session crashes after ${\sim}25{,}000$ \texttt{whnf}
+    calls due to cumulative growth of internal state (caches, discriminant
+    trees, instance tables). The crash point depends on count, not on
+    which declarations are processed.
+
+  \item \textbf{Process-level memory growth (values).} Applying
+    \texttt{whnf} to definition values causes monotonic RSS growth that
+    crashes regardless of batch size.
+\end{enumerate}
+
+\paragraph{Solution.} Declarations are processed in micro-batches of~10,
+each in a fresh \texttt{MetaM} session. Values are always canonicalized
+with Level~0 only (no \texttt{whnf}). For theorems, the value hash is
+the sentinel \texttt{PROOF\_IRRELEVANT} (proof irrelevance).
+
+The result is an asymmetric strategy: \textbf{types get L1, values get L0}.
+Hash computation is split into two phases (canonicalize+hash vs.\
+pretty-print) in separate \texttt{MetaM} sessions, with a flush every
+5{,}000 declarations to bound live \texttt{Expr} objects in memory.
+
+
+% --------------------------------------------------------------------
+\subsection{Serialization}
+\label{sec:serial}
+% --------------------------------------------------------------------
+
+The canonical expression is serialized into a \texttt{ByteArray} with a
+unique tag byte per \texttt{Expr} constructor followed by its children.
+Binder names are omitted (de~Bruijn indices suffice).
+\texttt{BinderInfo} is included for lambda and forall. \texttt{.mdata}
+is transparent (the child is serialized directly).
+
+
+% --------------------------------------------------------------------
+\subsection{Hashing Modes}
+\label{sec:modes}
+% --------------------------------------------------------------------
+
+Two modes determine how references to other declarations
+(\texttt{.const name levels}) are serialized:
+
+\paragraph{Name-based (default).} The declaration's \texttt{Name} is
+serialized as a UTF-8 string. Fast and stable within a single library,
+but an address changes if a dependency is renamed.
+
+\paragraph{Content-based (Merkle DAG).} The 32-byte content hash of the
+referenced declaration is emitted instead of its name. Declarations are
+processed in topological (dependency) order via Kahn's algorithm so that
+each hash incorporates its dependencies' hashes. The result is a Merkle
+DAG where identity depends only on the transitive mathematical content.
+
+
+% --------------------------------------------------------------------
+\subsection{Proof Irrelevance}
+\label{sec:proof}
+% --------------------------------------------------------------------
+
+For theorems, all proofs are definitionally equal by Lean's proof
+irrelevance axiom. The value hash is set to the sentinel
+\texttt{PROOF\_IRRELEVANT}. A theorem's identity is determined entirely by
+its type address~--- \emph{what} it proves, not \emph{how}.
+
+
+% ====================================================================
+\section{Resolution}
+\label{sec:resolution}
+% ====================================================================
+
+An address space is only as useful as the service that resolves it.
+
+
+% --------------------------------------------------------------------
+\subsection{Batch Indexing}
+% --------------------------------------------------------------------
+
+The CLI command \texttt{ca fetch} walks a compiled environment, computes
+content addresses, and stores the mappings in Redis. The
+\texttt{ca address} command exports a JSON manifest and optional TSV edge
+list.
+
+\begin{lstlisting}[style=pseudo,caption={Batch indexing}]
+ca fetch -m Mathlib --level 1
+ca address -m Mathlib --mode content --edges edges.tsv
+ca address --name Nat.add_comm --level 1 --mode content
+\end{lstlisting}
+
+
+% --------------------------------------------------------------------
+\subsection{Resolution by Name}
+% --------------------------------------------------------------------
+
+The \texttt{use} command resolves a fully qualified name to its content
+address, source module, kind, and pretty-printed type. The \texttt{use!}\
+variant additionally calls \texttt{Lean.importModules} to dynamically load
+the source module, making the declaration available for subsequent code.
+
+\begin{lstlisting}[caption={Name-based resolution and dynamic import}]
+use Nat.add_comm            -- read-only lookup
+use! Nat.add_comm           -- lookup + import
+
+-- Now Nat.add_comm is in scope
+example : forall n m : Nat, n + m = m + n := Nat.add_comm
+\end{lstlisting}
+
+
+% --------------------------------------------------------------------
+\subsection{Auto-Resolution with \texttt{resolve\%}}
+% --------------------------------------------------------------------
+
+\texttt{resolve\%} wraps a term in a try/catch: if normal elaboration
+fails, it queries Redis for the identifier, imports the source module, and
+retries. This is the lightest workaround for the absence of a global
+``unknown identifier'' hook in Lean\,4's elaboration pipeline.
+
+\begin{lstlisting}[caption={Implicit resolution}]
+example : forall n m : Nat, n + m = m + n := resolve% Nat.add_comm
+\end{lstlisting}
+
+
+% ====================================================================
+\section{Equivalence Classes}
+\label{sec:equiv}
+% ====================================================================
+
+Two declarations with the same hash state the same mathematical fact. The
+set of all declarations sharing a hash forms an \emph{equivalence class}.
+
+\paragraph{Same hash does not mean interchangeable.}
+The content address captures the \emph{type}, not the proof term, runtime
+behavior, or tactic metadata:
+
+\begin{itemize}
+  \item \textbf{Theorems in direct proofs:} interchangeable (proof
+    irrelevance).
+  \item \textbf{Theorems in tactics:} not interchangeable.
+    \texttt{simp [Nat.add\_mul]} relies on the \texttt{@[simp]} attribute
+    attached to that specific name.
+  \item \textbf{Definitions:} not interchangeable (may compute
+    differently).
+  \item \textbf{Instances:} not interchangeable (registered by name).
+\end{itemize}
+
+For this reason, resolution is always \emph{by name}. The hash serves as a
+stable, project-independent identifier for alias discovery and cross-project
+reference, but resolution goes through a specific name.
+
+\begin{lstlisting}[style=output,caption={Alias discovery via name-based resolution}]
+Resolved: Nat.add_mul
+  Hash:   e1ea8f392f15...  (L1)
+  Module: Init.Data.Nat.Basic
+  Kind:   theorem
+  Type:   forall (n m k : Nat), (n + m) * k = n * k + m * k
+  Aliases (1): Nat.right_distrib
+\end{lstlisting}
+
+
+% ====================================================================
+\section{Implementation}
+\label{sec:impl}
+% ====================================================================
+
+The implementation is a single Lean\,4 package (\texttt{CA}), available
+at \url{https://github.com/marcellop71/CA}, containing both the
+content-addressing engine and the registry module.  Downstream projects
+depend on it with a single line in their \texttt{lakefile.lean}:
+
+\begin{lstlisting}[style=pseudo]
+require ca from git "https://github.com/marcellop71/CA" @ "main"
+\end{lstlisting}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+  \toprule
+  \textbf{Module} & \textbf{Role} \\
+  \midrule
+  \texttt{CA.Canonical}           & L0 (pure) and L1 (MetaM) canonicalization \\
+  \texttt{CA.SHA256}              & SHA-256 FFI wrapper (OpenSSL EVP) \\
+  \texttt{CA.ExprHash}            & Expr serialization, batch hashing, Merkle DAG \\
+  \texttt{CA.Export}              & JSON manifest, TSV edge list, summary statistics \\
+  \texttt{CA.Util}                & \texttt{collectConstants}, \texttt{constantKind} \\
+  \texttt{CA.Registry.Basic}      & Entry types, \texttt{NameMapExtension}s, query API \\
+  \texttt{CA.Registry.Attributes} & \texttt{@[publish]}, \texttt{@[open\_point]} registration \\
+  \texttt{CA.Registry.Generate}   & \texttt{ca registry} command, status classification, JSON output \\
+  \bottomrule
+\end{tabular}
+\caption{Implemented modules. Additional registry modules (resolution
+  elaborators, sources management) are designed but not yet implemented.}
+\end{table}
+
+SHA-256 hashing uses OpenSSL's EVP API via a minimal C~shim, declared on
+the Lean side as \texttt{@[extern "lean\_sha256\_hash"] opaque sha256 :
+ByteArray -> IO ByteArray}.
+
+
+% ====================================================================
+\section{Limitations}
+\label{sec:limits}
+% ====================================================================
+
+\begin{itemize}
+  \item \textbf{Level~0 and Level~1 only.} Definitionally equal types
+    beyond reducible transparency still receive different hashes. Level~2
+    would require unique normal forms that do not exist in general.
+
+  \item \textbf{L1 requires micro-batching.} Native \texttt{whnf} crashes
+    after ${\sim}25{,}000$ declarations in a single \texttt{MetaM} session.
+    An upstream fix (heartbeat checks in the native code) would eliminate
+    this.
+
+  \item \textbf{Values use L0 only.} \texttt{whnf} on values causes
+    process-level memory growth that crashes regardless of batch size.
+
+  \item \textbf{Toolchain dependence.} L1 addresses depend on
+    \texttt{whnf} behavior, which could change across Lean versions. L0
+    addresses are pure and stable.
+
+  \item \textbf{No global resolution hook.} \texttt{resolve\%} is required
+    because Lean\,4 does not support user-defined fallbacks for unresolved
+    names. Eliminating this would require upstream changes.
+\end{itemize}
+
+\end{document}
