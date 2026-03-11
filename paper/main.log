@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.17.0 (TeX Live 2023/Debian)  (format=lualatex 2025.11.14)  11 MAR 2026 17:36
+This is LuaHBTeX, Version 1.17.0 (TeX Live 2023/Debian)  (format=lualatex 2025.11.14)  11 MAR 2026 17:41
  restricted system commands enabled.
 **main.tex
 (./main.tex
@@ -682,10 +682,6 @@ Underfull \hbox (badness 3219) in paragraph at lines 1072--1075
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-22>
  ***********
-
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
 Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: 6BBB50C89838E230E7E40ABF7F28B49B;2048.
 )
@@ -711,7 +707,7 @@ blic/lm/lmroman12-regular.otf></usr/share/texmf/fonts/opentype/public/lm/lmroman
 12-bold.otf></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10
 .pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></u
 sr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb>
-Output written on main.pdf (16 pages, 157388 bytes).
+Output written on main.pdf (16 pages, 157382 bytes).
 
 PDF statistics: 472 PDF objects out of 1000 (max. 8388607)
  419 compressed objects within 5 object streams
