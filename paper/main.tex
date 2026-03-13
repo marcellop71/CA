@@ -264,6 +264,85 @@ registrations) that the hash does not capture, and definitions with the
 same type may compute differently.  We discuss these limits in
 Section~\ref{sec:equiv}.
 
+\subsection{Features}
+
+  \paragraph{Search by statement, not by name}
+  \label{rem:search}
+  Content-addressing inverts the usual discovery workflow.  To determine
+  whether a result is already known---proved, published as an open
+  conjecture, or simply mentioned in a registry---one does not need to
+  guess the name a library author might have chosen, nor search through
+  documentation by keyword.  Instead, it suffices to \emph{write the
+  statement} as a Lean type expression, compute its content address
+  (a single call to the hashing pipeline), and look up that address
+  in the registry.  A match means the exact mathematical fact is already
+  recorded, regardless of the name, file, or project it lives in.
+  A miss means no project in the registry has published that statement
+  at the chosen canonicalization level.  The search is determined
+  entirely by the mathematics---no text matching, no naming conventions,
+  no knowledge of library structure required.
+
+  \paragraph{Address is stable under proof improvement}
+  [Stable under proof improvement]
+  \label{rem:proof-improvement}
+  Because the content address depends only on the statement, improving a
+  proof---making it shorter, faster, or more elegant---does not change
+  the address.  The mathematical ``API'' is stable even as
+  implementations improve.  A library can silently replace a slow proof
+  with a faster one and no downstream content address is affected.
+  It's the analogue of "you can refactor the implementation without changing the interface" in software.
+
+  \paragraph{Content addresses as permanent citations}
+  \label{rem:citations}
+  Academic papers about formal mathematics currently cite theorems by
+  library name (e.g., \texttt{Finset.sum\_add\_distrib}).  These
+  citations break silently when libraries refactor.  A content address
+  serves as a permanent reference to a mathematical fact.
+  A paper citing \texttt{ca:a1b2c3\ldots} remains
+  valid regardless of future renaming or reorganization.
+
+  \paragraph{Memoization for proof search (AI angle)}
+  \label{rem:memoization}
+  In automated or AI-assisted proof search, the same goal type often
+  arises in different proof contexts.  A content address canonically
+  identifies the goal independently of the surrounding proof state.
+  This enables a global lookup table: before attempting synthesis, check
+  whether the goal's content address already appears in the registry.
+  If it does, the proof can be retrieved rather than re-discovered.
+
+  \paragraph{Version-independent references}
+  \label{rem:versions}
+  A content address for a theorem is the same whether computed from
+  Mathlib v4.3 or v4.9, provided the mathematical statement has not
+  changed.  This decouples mathematical identity from library
+  versioning: a project can depend on a \emph{mathematical fact} rather
+  than on a specific version of a specific package.
+
+  \paragraph{Progress tracking for formalization campaigns}
+  \label{rem:campaigns}
+  A formalization effort (e.g., all theorems in a textbook chapter) can
+  be specified as a list of content addresses registered as open points.
+  Progress is then the fraction of addresses whose status has moved from
+  \texttt{open} to \texttt{proved}, a well-defined, cross-project
+  metric that updates automatically via the status cascade.
+
+  \paragraph{Toward granular building.}
+  Lean's build system (Lake) operates at the granularity of entire
+  modules: importing a single declaration requires compiling the full
+  module and all its transitive dependencies.  This monolithic model
+  compounds the cost of name-based coupling---a project that needs one
+  lemma from a large module pays for thousands of unrelated declarations.
+  Content-addressing opens a path toward finer granularity.  If
+  declarations are individually addressable by content, a build system
+  could in principle fetch and verify only the specific results a project
+  actually uses, rather than pulling in entire module trees.  Granular
+  addressing would lead naturally to granular imports: referencing
+  individual facts rather than files.  This is a harder problem in a
+  compiled ecosystem like Lean, where elaboration, compilation, and
+  kernel-checking are tightly coupled at the module level, but
+  content-addressing provides the necessary first step---a stable,
+  module-independent name for each declaration.
+
 % =====================================================================
 \section{A working pipeline}
 \label{sec:pipeline}

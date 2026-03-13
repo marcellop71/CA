@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.17.0 (TeX Live 2023/Debian)  (format=lualatex 2025.11.14)  11 MAR 2026 17:41
+This is LuaHBTeX, Version 1.17.0 (TeX Live 2023/Debian)  (format=lualatex 2025.11.14)  13 MAR 2026 12:27
  restricted system commands enabled.
 **main.tex
 (./main.tex
@@ -624,77 +624,84 @@ Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on i
 nput line 186.
 LaTeX Font Info:    Font shape `TU/lmtt/bx/n' in size <10> not available
 (Font)              Font shape `TU/lmtt/b/n' tried instead on input line 187.
- [2] [3]
-Overfull \hbox (2.42278pt too wide) in paragraph at lines 338--348
+ [2] [3] [4]
+Overfull \hbox (2.42278pt too wide) in paragraph at lines 417--427
 []\TU/lmr/m/n/10.95 As an ex-am-ple, con-sider \TU/lmtt/m/n/10.95 theorem add_co
 mm_v1 : $\OMS/cmsy/m/n/10.95 8$ \TU/lmtt/m/n/10.95 (a b : Nat), a + b = b + a \
 TU/lmr/m/n/10.95 and a vari-
  []
 
-[4] [5]
-Overfull \hbox (88.1875pt too wide) in paragraph at lines 495--502
+[5] [6] [7]
+Overfull \hbox (88.1875pt too wide) in paragraph at lines 574--581
 []\TU/lmr/bx/n/10.95 Eval-u-a-tion on Math-lib.[] \TU/lmr/m/n/10.95 We eval-u-at
 ed the pipeline on the en-vi-ron-ment loaded by \TU/lmtt/m/n/10.95 Mathlib.Algeb
 ra.Group.Basic\TU/lmr/m/n/10.95 ,
  []
 
-[6]
-Overfull \hbox (0.89781pt too wide) in paragraph at lines 526--529
+
+Overfull \hbox (0.89781pt too wide) in paragraph at lines 605--608
 []\TU/lmr/bx/n/10.95 Ex-am-ples of de-tected du-pli-cates.[] \TU/lmr/m/n/10.95 
 The equiv-a-lence classes re-veal gen-uine duplicates---theorems
  []
 
-[7] [8] [9] [10]
-Overfull \hbox (29.75473pt too wide) in paragraph at lines 809--821
+[8] [9]
+
+LaTeX Warning: `h' float specifier changed to `ht'.
+
+[10] [11]
+Overfull \hbox (29.75473pt too wide) in paragraph at lines 888--900
 []\TU/lmr/bx/n/10.95 An-no-ta-tion at-tributes.[] \TU/lmr/m/n/10.95 Au-thors an-
 no-tate their code with two at-tributes pro-vided by the \TU/lmtt/m/n/10.95 CA.R
 egistry
  []
 
 
-Overfull \hbox (7.28523pt too wide) in paragraph at lines 853--858
+LaTeX Warning: `h' float specifier changed to `ht'.
+
+
+Overfull \hbox (7.28523pt too wide) in paragraph at lines 932--937
 []\TU/lmr/bx/n/10.95 Reg-istry folder.[] \TU/lmr/m/n/10.95 The \TU/lmtt/m/n/10.
 95 registry/ \TU/lmr/m/n/10.95 folder is gen-er-ated lo-cally in-side each proje
 ct. The \TU/lmtt/m/n/10.95 #ca_registry
  []
 
-[11]
-Overfull \hbox (13.3589pt too wide) in paragraph at lines 908--919
+[12]
+Overfull \hbox (13.3589pt too wide) in paragraph at lines 987--998
 \TU/lmtt/m/n/10.95 lakefile.lean\TU/lmr/m/n/10.95 ; (2) an-no-tate dec-la-ra-tio
 ns with \TU/lmtt/m/n/10.95 @[publish] \TU/lmr/m/n/10.95 or \TU/lmtt/m/n/10.95 @[
 open_point]\TU/lmr/m/n/10.95 ; (3) add \TU/lmtt/m/n/10.95 #ca_registry
  []
 
 
-Overfull \hbox (6.0027pt too wide) in paragraph at lines 908--919
+Overfull \hbox (6.0027pt too wide) in paragraph at lines 987--998
 \TU/lmtt/m/n/10.95 "registry/" \TU/lmr/m/n/10.95 to a Lean file that im-ports th
 e an-no-tated mod-ules; (4) \TU/lmtt/m/n/10.95 lake build\TU/lmr/m/n/10.95 , com
 -mit \TU/lmtt/m/n/10.95 registry/\TU/lmr/m/n/10.95 ,
  []
 
-[12] [13]
-Underfull \hbox (badness 3219) in paragraph at lines 1072--1075
+[13] [14] [15]
+Underfull \hbox (badness 3219) in paragraph at lines 1151--1154
 []\TU/lmr/m/n/10.95 J. Benet, ``IPFS---Content ad-dressed, ver-sioned, P2P file sys-tem,'' \TU/lmr/m/it/10.95 arXiv preprint
  []
 
-[14] [15] [16] (./main.aux)
+[16] [17] (./main.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-22>
  ***********
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: 6BBB50C89838E230E7E40ABF7F28B49B;2048.
+(rerunfilecheck)             Checksum: 6828A68AD123DE2FC1D0857AC1416507;2146.
 )
 
 Here is how much of LuaTeX's memory you used:
- 16522 strings out of 476553
- 305291,1977958 words of node,token memory allocated
+ 16538 strings out of 476553
+ 305273,1977958 words of node,token memory allocated
  534 words of node memory still in use:
    6 hlist, 2 vlist, 2 rule, 2 glue, 4 kern, 1 glyph, 9 attribute, 56 glue_spec,
  9 attribute_list, 1 write, 3 pdf_action nodes
-   avail lists: 2:3066,3:372,4:7084,5:6039,6:83,7:12839,8:49,9:14514,10:47,11:10
-01
- 38082 multiletter control sequences out of 65536+600000
+   avail lists: 1:1,2:3066,3:378,4:7084,5:6004,6:86,7:12196,8:49,9:14507,10:47,1
+1:954
+ 38089 multiletter control sequences out of 65536+600000
  57 fonts using 4554615 bytes
  79i,8n,89p,300b,651s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf/fonts/opentype/public/lm/lmmono10-italic.otf></usr/share/texmf
@@ -707,10 +714,10 @@ blic/lm/lmroman12-regular.otf></usr/share/texmf/fonts/opentype/public/lm/lmroman
 12-bold.otf></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10
 .pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></u
 sr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb>
-Output written on main.pdf (16 pages, 157382 bytes).
+Output written on main.pdf (17 pages, 162234 bytes).
 
-PDF statistics: 472 PDF objects out of 1000 (max. 8388607)
- 419 compressed objects within 5 object streams
- 192 named destinations out of 1000 (max. 131072)
- 105 words of extra memory for PDF output out of 10000 (max. 100000000)
+PDF statistics: 489 PDF objects out of 1000 (max. 8388607)
+ 435 compressed objects within 5 object streams
+ 201 named destinations out of 1000 (max. 131072)
+ 113 words of extra memory for PDF output out of 10000 (max. 100000000)
 
