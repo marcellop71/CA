@@ -13,13 +13,18 @@ private def isDefnInfo : ConstantInfo → Bool
 /-- Parse optional string description from attribute syntax.
     Handles `@[attr]` and `@[attr "description"]`. -/
 private def parseDescription (stx : Syntax) : AttrM String := do
-  -- stx is the full attribute syntax; children after index 0 are arguments
-  let numArgs := stx.getNumArgs
-  if numArgs <= 1 then return ""
-  let arg := stx[1]!
-  match Syntax.isStrLit? arg with
+  -- stx structure: `publish (str)?` — stx[0] is "publish", stx[1] is optional group
+  if stx.getNumArgs <= 1 then return ""
+  let optArg := stx[1]!
+  -- optional syntax node: if present, the string literal is its first child
+  if optArg.isNone then return ""
+  let strNode := optArg[0]!
+  match Syntax.isStrLit? strNode with
   | some s => return s
   | none => return ""
+
+/-- Syntax for `@[open_point]` or `@[open_point "description"]`. -/
+syntax (name := open_point) "open_point" (str)? : attr
 
 /-- `@[open_point]` or `@[open_point "description"]` — marks a `def X : Prop`
     as an open problem in the formal registry. -/
@@ -39,6 +44,9 @@ initialize registerBuiltinAttribute {
     let desc ← parseDescription stx
     openPointExt.add name { description := desc }
 }
+
+/-- Syntax for `@[publish]` or `@[publish "description"]`. -/
+syntax (name := publish) "publish" (str)? : attr
 
 /-- `@[publish]` or `@[publish "description"]` — marks a theorem or definition
     for publication to the formal registry. -/
