@@ -23,6 +23,9 @@ example : forall (s : Finset Nat) (f g : Nat -> Int),
   Finset.sum_add_distrib
 \end{lstlisting}
 
+\noindent
+In plain language, this code states: ``For any finite set~$s$ of natural numbers and any two functions $f, g \colon \mathbb{N} \to \mathbb{Z}$, the sum of $(f+g)$ over~$s$ equals the sum of~$f$ over~$s$ plus the sum of~$g$ over~$s$.''  In other words, finite sums distribute over pointwise addition of functions.  The proof is supplied by invoking the library lemma \texttt{Finset.sum\_add\_distrib}.
+
 This single reference, \texttt{Finset.sum\_add\_distrib}, encodes three
 pieces of information beyond the mathematics: (1)~the \textbf{project}
 (Mathlib), (2)~the \textbf{file}
