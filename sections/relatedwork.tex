@@ -1,0 +1,46 @@
+% =====================================================================
+\section{Related Work}
+\label{sec:related}
+% =====================================================================
+
+\paragraph{Content-addressing in software and programming languages.}
+Content-addressed storage is well-established in software systems
+(Git~\cite{git}, IPFS~\cite{benet2014ipfs},
+Nix~\cite{dolstra2004nix}).  The closest analog in programming
+languages is Unison~\cite{unison}, which was designed from the ground
+up around content-addressing: names are metadata, refactoring never
+invalidates hashes, and the full syntax tree is hashed.  We differ in
+three ways: we \emph{retrofit} content-addressing onto an existing
+language not designed for it; we hash only the \emph{type}, not the
+implementation (justified by proof irrelevance); and canonicalization
+in a dependently typed setting is complicated by definitional equality
+and universe polymorphism.
+
+\paragraph{Formal mathematics infrastructure.}
+Hurd's OpenTheory~\cite{hurd2011opentheory} tackled the same core
+problem---prover-independent theorem identity---for the HOL family,
+using theory interpretations rather than cryptographic hashing.
+Gauthier et al.~\cite{gauthier2019aligning} and M\"uller et
+al.~\cite{muller2017alignment} align concepts \emph{across} type
+theories; our content-addressing operates \emph{within} one, where
+canonical forms can be compared syntactically---a natural prerequisite
+for cross-system alignment.  The OMDoc/MMT
+framework~\cite{rabe2013scalable, kohlhase2006omdoc} and the vision of
+Kohlhase and Rabe~\cite{kohlhase2017qed} articulate a pluralistic
+formal library; we provide a concrete identity mechanism for it.
+Existing library management (Mathlib's monorepo~\cite{mathlib4}, Coq's
+opam packages~\cite{coq}, Isabelle's AFP~\cite{isabelle_afp}) relies
+on name-based identity throughout.
+
+\paragraph{Proof repair and deduplication.}
+Ringer et al.~\cite{ringer2021repair} and Gopinathan et
+al.~\cite{gopinathan2023repair} repair proofs broken by library
+refactoring; content-addressing aims to prevent such breakage rather
+than mitigate it.  Type-based deduplication of theorem statements is
+used in AI-for-theorem-proving pipelines~\cite{syntheticthm},
+essentially Level~0 without cryptographic persistence.  The question of
+normal forms in dependent type theory~\cite{abel2018decidability,
+coquand1991algorithm} underlies our canonicalization; we sidestep full
+normalization with pragmatic partial levels.
+
+% =====================================================================
