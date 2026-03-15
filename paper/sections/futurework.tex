@@ -1,0 +1,87 @@
+% =====================================================================
+\subsection{Limitations and Future Work}
+\label{sec:limits}
+% =====================================================================
+
+\paragraph{Current limitations.}
+Level~0 and Level~1 canonicalization do not capture full definitional
+equality; the gap between Level~1 and the ideal is large and may be
+fundamentally unclosable.  Level~1 addresses depend on Lean's
+\texttt{whnf} behavior, which can change across toolchain versions;
+Level~0 addresses are stable within a major Lean version, while Level~1
+should be considered best-effort within a given toolchain.  Lean's
+native \texttt{whnf} (implemented in C) lacks heartbeat checks and
+crashes on large environments; a micro-batching workaround is effective
+but inelegant (Appendix~\ref{app:engineering}).  Applying \texttt{whnf}
+to definition values causes process-level memory growth that crashes
+regardless of batch boundaries, limiting content-addressing of
+definitions (as opposed to theorems, where proof irrelevance makes value
+hashing unnecessary).  Finally, Lean~4's elaboration pipeline does not
+support user-defined fallbacks for unresolved names; our resolution
+mechanism requires explicit syntax (\texttt{resolve\%}), preventing
+seamless integration.
+
+\paragraph{Future work.}
+\phantomsection\label{sec:future}
+Several directions are worth pursuing.  \emph{Resolution elaborators}:
+implement \texttt{use}, \texttt{use!}, and \texttt{resolve\%} as Lean~4
+elaborators that query the registry, resolve by content address, and
+dynamically import modules.  The intended syntax (not yet implemented):
+
+\begin{lstlisting}[caption={Prospective resolution syntax (not yet implemented)}]
+-- resolve% looks up a content address in the registry and
+-- returns the name of a matching declaration in scope
+example : forall a b : Nat, a + b = b + a :=
+  resolve% "a1b2c3d4e5f6..."   -- resolves to Nat.add_comm
+\end{lstlisting}
+
+\emph{Ecosystem-wide indexing}: apply
+content-addressing to the entirety of Mathlib to produce a global index
+of equivalence classes, enabling large-scale duplicate detection,
+library health metrics, and structured navigation.
+\emph{Open-problem workflows}: develop the open-point and
+conditional-result mechanism (Section~\ref{sec:results}) into a robust
+workflow, addressing false conjectures, \texttt{sorry}-based vs.\
+axiomatic assumptions, and cross-project status curation.
+\emph{AI-assisted proof search}: content addresses provide a stable,
+type-based index for machine learning models to retrieve relevant lemmas
+by querying the content address of a goal type.
+\emph{Cross-system alignment}: explore content-addressing in other proof
+assistants (Coq, Isabelle, Agda) and investigate whether addresses can
+be made comparable via shared canonicalization.
+\emph{Intermediate canonicalization levels}: investigate canonicalization
+at semireducible transparency or with selective instance unfolding.
+\emph{Formal verification}: prove (in Lean itself) that the
+canonicalization and serialization stages preserve the intended
+equivalence relation.
+
+\paragraph{Engineering Obstacles}
+\label{app:engineering}
+
+A practical obstacle to Level~1 canonicalization at scale: Lean's native
+\texttt{whnf} (implemented in C) contains no heartbeat or memory
+checks.  When processing large environments (${\sim}58{,}000$
+declarations in Mathlib modules), two failure modes arise.  First,
+\emph{MetaM state accumulation}: a single \texttt{MetaM} session
+crashes after ${\sim}25{,}000$ \texttt{whnf} calls due to cumulative
+growth of caches, discriminant trees, and instance tables; the crash
+point depends on call count, not on which specific declarations are
+processed.  Second, \emph{process-level memory growth}: applying
+\texttt{whnf} to definition values causes monotonic RSS growth that
+eventually crashes regardless of batch boundaries.
+
+\paragraph{Micro-batching.}  Our workaround is to process declarations
+in micro-batches of~10, each in a fresh \texttt{MetaM} session.  Types
+receive Level~1 normalization; values are always canonicalized with
+Level~0 only (no \texttt{whnf}).  For theorems, the value hash is the
+sentinel \texttt{PROOF\_IRRELEVANT} (proof irrelevance).  The result is
+an asymmetric strategy: \textbf{types get L1, values get L0}.  Hash
+computation is split into two phases (canonicalize+hash vs.\
+pretty-print) in separate \texttt{MetaM} sessions, with a flush every
+5{,}000 declarations to bound live \texttt{Expr} objects in memory.
+
+An upstream fix---heartbeat checks and resource guards in Lean's native
+\texttt{whnf} implementation---would eliminate the need for
+micro-batching entirely.
+
+% =====================================================================

@@ -1,0 +1,50 @@
+% =====================================================================
+\section{Introduction}
+\label{sec:intro}
+% =====================================================================
+
+Software engineers are familiar with content-addressing.  Git identifies
+every commit, tree, and blob by the SHA-1 hash of its
+content~\cite{git}.  The Nix package manager derives store paths from
+the hash of all build inputs~\cite{dolstra2004nix}.  IPFS addresses
+files by their cryptographic hash, making retrieval
+location-independent~\cite{benet2014ipfs}.  The Unison programming
+language names functions by the hash of their syntax
+tree~\cite{unison}.
+
+In each case, the core idea is the same: derive the identifier from the
+\emph{content itself}, not from a human-chosen name or a filesystem
+location.  The result is an identifier that is \emph{stable} (it does
+not change when the content moves), \emph{universal} (it requires no
+central authority), and \emph{self-authenticating} (anyone can verify it
+by rehashing).
+
+Formal mathematics has not yet adopted this pattern.  Theorems in proof
+assistants---Lean~\cite{lean4}, Coq~\cite{coq}, Isabelle~\cite{isabelle},
+Agda~\cite{agda}---are identified by fully qualified names tied to
+project structure, file paths, and namespace conventions.  Renaming a
+file, moving a declaration to a different module, or reorganizing a
+namespace hierarchy breaks every downstream reference, even though the
+mathematical content is unchanged.  This problem is not hypothetical: it
+occurs routinely in Mathlib, the largest Lean~4 library, which undergoes
+continuous refactoring across its ${\sim}200{,}000$
+declarations~\cite{mathlib4}.  A complementary line of work addresses
+the downstream consequence---automated proof
+repair~\cite{ringer2021repair, gopinathan2023repair}---but does not
+eliminate the root cause: names are not intrinsic to the mathematics.
+
+This paper asks: \emph{can we apply content-addressing to formal
+mathematics?}  We show that the answer is yes, with important caveats
+about the granularity of equivalence (Section~\ref{sec:equiv}).  We
+describe a working implementation for Lean~4 and a decentralized
+registry architecture that requires no infrastructure beyond Git.
+
+\paragraph{Contributions.} A content-addressing pipeline for Lean~4 declarations:
+canonicalization, serialization, and SHA-256 hashing (Section~\ref{sec:pipeline}).
+Two canonicalization levels with different stability/equivalence trade-offs (Section~\ref{sec:canon}).
+A Merkle DAG hashing mode that gives declarations truly content-determined identity across project boundaries (Section~\ref{sec:modes}).
+A decentralized registry architecture exploiting the monotonicity of mathematical proof (Section~\ref{sec:registry}). Empirical evaluation on 57{,}613 theorems from a Mathlib
+module environment (Section~\ref{sec:results}). An open-source implementation as a Lean~4 library and CLI tool (Section~\ref{sec:impl}). A working implementation
+is available at \href{https://github.com/marcellop71/CA}{https://github.com/marcellop71/CA}
+
+% --------------------------------------------------------------------

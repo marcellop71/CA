@@ -1,0 +1,30 @@
+% =====================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =====================================================================
+
+We have presented a content-addressing system for formal mathematics,
+implemented as a Lean~4 library.  By hashing canonicalized type
+expressions, we assign declarations stable identifiers determined by
+their mathematical content rather than their human-chosen names.
+
+Content-addressing does not require full normalization to be useful.
+Even partial canonicalization (Level~0) provides meaningful stability
+and cross-project discoverability.  The decentralized registry
+architecture, made possible by the monotonicity of mathematical proof,
+requires no infrastructure beyond Git---though significant engineering
+work remains to make it practical at ecosystem scale.
+
+The system is a working prototype, and important challenges
+remain---most fundamentally, the gap between our canonicalization levels
+and full definitional equality.  We hope this work demonstrates that
+content-addressing is a productive lens through which to view the
+organization of formal mathematical knowledge, and that the tools
+presented here are a useful step toward a more interconnected ecosystem
+for formalized mathematics.
+
+
+% =====================================================================
+% References
+% =====================================================================
+
