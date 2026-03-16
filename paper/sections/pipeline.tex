@@ -80,6 +80,8 @@ canonical form and receive the same hash.  On
 collapsed by reducible unfolding.  Section~\ref{sec:results} presents a
 larger-scale evaluation.
 
+\franz{How useful is Level~1 in practice? Probably handles ``boring'' statements, but two mathematicians independently formalizing the same interesting theorem---would they get the same hash? Almost never at Level~1.}
+
 \paragraph{Level~2: full definitional equality (open problem).}
 The ideal canonicalization would assign the same hash to all
 definitionally equal types.  However, Lean's dependent type theory does
@@ -88,6 +90,10 @@ equality~\cite{abel2018decidability}.  Achieving Level~2 would require
 either restricting the fragment of the type theory considered, or
 developing new normalization techniques.  We leave this as an open
 problem (see Section~\ref{sec:equiv} for further discussion).
+
+\franz{Even Level~2 may not suffice---people use slightly different formalizations.}
+
+\franz{Propose Level~3: formally different but ``spiritually the same''---one trivially proves the other. Quantify with fuzzy match + trivial proof detection (e.g.\ \texttt{exact?}\ or \texttt{apply?}\ in one step).}
 
 % --------------------------------------------------------------------
 \subsection{Serialization, Hashing, and Hashing Modes}
@@ -104,6 +110,8 @@ explicit, instance, etc.)\ is included for lambda and forall nodes.
 \texttt{.const name levels}, the treatment of \texttt{name} depends on
 the hashing mode (below).
 
+\sam{Hash-based proof compression: replace subexpressions by hash on network layer. Sam's ``hexpr'' constructor elides subterm structure for storage/communication.}
+
 \paragraph{Hashing.}
 The serialized byte array is hashed with SHA-256, producing a
 64-character hexadecimal string.  We use SHA-256 via OpenSSL's EVP API
@@ -111,6 +119,7 @@ through a minimal C FFI shim, chosen for ubiquity and ease of binding
 rather than performance (a faster hash such as BLAKE3 would work equally
 well---the choice of hash function is orthogonal to the addressing
 design).
+\simone{Address: (a) mutual recursion in Merkle DAG, (b) why SHA-256 not BLAKE3, (c) literal \texttt{PROOF\_IRRELEVANT} sentinel value, (d) is L0 truly Lean-version-independent given \texttt{Expr} changes?}
 
 \paragraph{Hashing modes.}
 \label{sec:modes}
@@ -216,6 +225,7 @@ how to handle conjectures that turn out to be false (or independent),
 how to distinguish \texttt{sorry}-based development from genuinely
 axiomatic assumptions, and how to curate status metadata across
 projects.  We discuss these further in Section~\ref{sec:future}.
+\simone{Mark open-problem workflows (Sections 5.3--5.4) as speculative/future work. No real usage evidence. Address: who curates status? What if open point is false? \texttt{sorry}-based vs axiomatic?}
 
 \paragraph{Registry generation.}
 A project publishes its annotated declarations by adding
@@ -227,7 +237,7 @@ summary with counts by status) to the specified directory.
 
 \paragraph{Evaluation on Mathlib.}
 We evaluated the pipeline on the environment loaded by
-\texttt{Mathlib.Algebra.Group.Basic}, a core module of Mathlib that
+\texttt{Mathlib.\allowbreak Algebra.\allowbreak Group.\allowbreak Basic}, a core module of Mathlib that
 transitively imports 1{,}209 modules covering foundational arithmetic,
 data structures, and algebraic hierarchy definitions.  The pipeline was
 run in name-based mode at Level~1 (reducible normalization), restricted
@@ -304,6 +314,8 @@ transitive closure of a Mathlib module.  The current evaluation covers
 a single module's environment at Level~1 only.  A systematic comparison
 of Level~0 vs.\ Level~1 across multiple Mathlib entry points, and
 evaluation in content-based (Merkle DAG) mode, remain as future work.
+
+\simone{Quantitative evaluation across Mathlib: coverage, identical hashes at L0 vs L1, genuine duplicates, false positive rate, processing time. Produce a table across representative modules. CRITICAL.}
 
 
 

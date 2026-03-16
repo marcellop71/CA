@@ -24,6 +24,8 @@ example : forall (s : Finset Nat) (f g : Nat -> Int),
 \end{lstlisting}
 
 \noindent
+\moqian{Natural language explanation after Lean code listing---already pushed. Verify it reads well.}
+
 In plain language, this code states: ``For any finite set~$s$ of natural numbers and any two functions $f, g \colon \mathbb{N} \to \mathbb{Z}$, the sum of $(f+g)$ over~$s$ equals the sum of~$f$ over~$s$ plus the sum of~$g$ over~$s$.''  In other words, finite sums distribute over pointwise addition of functions.  The proof is supplied by invoking the library lemma \texttt{Finset.sum\_add\_distrib}.
 
 This single reference, \texttt{Finset.sum\_add\_distrib}, encodes three
@@ -144,6 +146,7 @@ Section~\ref{sec:equiv}.
   This enables a global lookup table: before attempting synthesis, check
   whether the goal's content address already appears in the registry.
   If it does, the proof can be retrieved rather than re-discovered.
+  \leo{Memoization for AI proof search: use content address to look up whether a goal has already been proved somewhere, regardless of naming conventions. Leo says this is ``particularly compelling.''}
 
   \paragraph{Version-independent references}
   \label{rem:versions}

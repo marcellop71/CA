@@ -14,6 +14,8 @@ project hosts a \texttt{registry/} folder in its own repo, and the
 global registry is the union of all such folders.  No additional
 infrastructure is needed---no IPFS, no blockchain, no central server.
 
+\sam{Compare P2P DHT (Sam's approach) vs Git-based registry (ours). Sam found DHT doesn't scale, moved to local-first + DHT for publishing locations only.}
+
 This simplicity is possible because \textbf{mathematical consensus is
 trivial}.  Unlike distributed systems that must agree on ordering or
 resolve write conflicts, a mathematical registry has a monotonic truth

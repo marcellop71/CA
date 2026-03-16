@@ -15,16 +15,19 @@ language not designed for it; we hash only the \emph{type}, not the
 implementation (justified by proof irrelevance); and canonicalization
 in a dependently typed setting is complicated by definitional equality
 and universe polymorphism.
+\simone{Deepen Unison comparison. Unison: designed around CA from start, hashes full AST, 512-bit SHA3. Ours: retrofit onto Lean, hash type only (proof irrelevance). Make structural difference explicit.}
 
 \paragraph{Formal mathematics infrastructure.}
 Hurd's OpenTheory~\cite{hurd2011opentheory} tackled the same core
 problem---prover-independent theorem identity---for the HOL family,
 using theory interpretations rather than cryptographic hashing.
+\simone{Add OpenTheory (Joe Hurd, 2009--2014)---cross-prover package management for HOL family. Closest prior system. Doesn't use crypto hashing but same core problem. CRITICAL.}
 Gauthier et al.~\cite{gauthier2019aligning} and M\"uller et
 al.~\cite{muller2017alignment} align concepts \emph{across} type
 theories; our content-addressing operates \emph{within} one, where
 canonical forms can be compared syntactically---a natural prerequisite
-for cross-system alignment.  The OMDoc/MMT
+for cross-system alignment.
+\simone{Deepen alignment work discussion. Gauthier-Kaliszyk solve harder problem across foundations (HOL4/Coq/Mizar). Ours cleaner but narrower (single type theory). Explain intra-system CA as prerequisite for cross-system.}  The OMDoc/MMT
 framework~\cite{rabe2013scalable, kohlhase2006omdoc} and the vision of
 Kohlhase and Rabe~\cite{kohlhase2017qed} articulate a pluralistic
 formal library; we provide a concrete identity mechanism for it.
@@ -32,13 +35,20 @@ Existing library management (Mathlib's monorepo~\cite{mathlib4}, Coq's
 opam packages~\cite{coq}, Isabelle's AFP~\cite{isabelle_afp}) relies
 on name-based identity throughout.
 
+\sam{Discuss HashMath: independent CIC + content addressing + P2P. Complementary---HashMath from scratch, ours within Lean.}
+
 \paragraph{Proof repair and deduplication.}
 Ringer et al.~\cite{ringer2021repair} and Gopinathan et
 al.~\cite{gopinathan2023repair} repair proofs broken by library
 refactoring; content-addressing aims to prevent such breakage rather
-than mitigate it.  Type-based deduplication of theorem statements is
+than mitigate it.
+\simone{Add proof repair literature: Ringer et al.\ PLDI 2021, Gopinathan et al.\ PLDI 2023. Complementary approach---automated repair vs stable identifiers.}  Type-based deduplication of theorem statements is
 used in AI-for-theorem-proving pipelines~\cite{syntheticthm},
-essentially Level~0 without cryptographic persistence.  The question of
+essentially Level~0 without cryptographic persistence.
+
+\leo{Discuss Yatima project (github.com/argumentcomputer/yatima) as prior work. Dead but had nice ideas---content addressing + zkSNARK for type-checking.}
+
+The question of
 normal forms in dependent type theory~\cite{abel2018decidability,
 coquand1991algorithm} underlies our canonicalization; we sidestep full
 normalization with pragmatic partial levels.

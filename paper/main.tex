@@ -1,95 +1,11 @@
 \documentclass[11pt]{article}
 
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
-\usepackage[margin=1in]{geometry}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{hyperref}
-\usepackage{booktabs}
-\usepackage{amsmath,amssymb}
-\usepackage{enumitem}
-\usepackage{caption}
-\usepackage{subcaption}
-\usepackage{tabularx}
-
-% ── Listing styles ────────────────────────────────────────────────────
-\definecolor{leanKeyword}{RGB}{0,0,180}
-\definecolor{leanComment}{RGB}{100,100,100}
-\definecolor{leanString}{RGB}{0,120,0}
-\definecolor{leanOutput}{RGB}{60,60,60}
-\definecolor{codebg}{RGB}{248,248,248}
-
-\lstdefinelanguage{Lean}{
-  morekeywords={import,open,namespace,end,def,theorem,example,syntax,
-    let,match,return,try,catch,do,if,then,else,fun,where,with,
-    partial,private,structure,deriving,in,for,mut,section,
-    attribute,initialize,class,instance},
-  morekeywords=[2]{use,resolve},
-  keywordstyle=\color{leanKeyword}\bfseries,
-  keywordstyle=[2]\color{leanKeyword}\bfseries,
-  sensitive=true,
-  morecomment=[l]{--},
-  morecomment=[n]{/-}{-/},
-  commentstyle=\color{leanComment}\itshape,
-  morestring=[b]",
-  stringstyle=\color{leanString},
-  basicstyle=\ttfamily\small,
-  breaklines=true,
-  showstringspaces=false,
-}
-
-\lstset{
-  language=Lean,
-  backgroundcolor=\color{codebg},
-  frame=single,
-  rulecolor=\color{black!20},
-  xleftmargin=2em,
-  framexleftmargin=1.5em,
-  numbers=left,
-  numberstyle=\tiny\color{black!40},
-  numbersep=8pt,
-  aboveskip=1em,
-  belowskip=1em,
-}
-
-\lstdefinestyle{output}{
-  language={},
-  basicstyle=\ttfamily\small\color{leanOutput},
-  frame=single,
-  rulecolor=\color{black!15},
-  backgroundcolor=\color{white},
-  numbers=none,
-  xleftmargin=2em,
-  framexleftmargin=0em,
-}
-
-\lstdefinestyle{pseudo}{
-  language={},
-  basicstyle=\ttfamily\small,
-  frame=single,
-  rulecolor=\color{black!20},
-  backgroundcolor=\color{codebg},
-  numbers=none,
-  xleftmargin=2em,
-  framexleftmargin=0em,
-}
-
-\lstdefinestyle{json}{
-  language={},
-  basicstyle=\ttfamily\small,
-  frame=single,
-  rulecolor=\color{black!20},
-  backgroundcolor=\color{codebg},
-  numbers=none,
-  xleftmargin=2em,
-  framexleftmargin=0em,
-}
+\input{preamble}
 
 % ── Metadata ──────────────────────────────────────────────────────────
 \title{\textbf{Content-Addressing Formal Mathematics}}
-\author{Marcello Paris et al. (DRAFT V1)}
+\author{Xinze Li\textsuperscript{1} \and Marcello Paris \and Simone Severini\textsuperscript{2} \\[4pt]
+\textsuperscript{1}University of Toronto \quad \textsuperscript{2}Google}
 \date{March 2026}
 
 \begin{document}
@@ -113,6 +29,7 @@ We explore content addressing for formal mathematics, introducing a stable ident
 \input{sections/registry}
 \input{sections/conclusion}
 
-\input{sections/bibliography}
+\bibliographystyle{plain}
+\bibliography{references}
 
 \end{document}
