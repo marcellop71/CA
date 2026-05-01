@@ -5,7 +5,7 @@
    "type": "git",
    "subDir": null,
    "scope": "",
-   "rev": "4de481629d32a89ab8622e20b5a185ef20d1ff6f",
+   "rev": "75ab559cbdef472d65b3d8053a99358846997926",
    "name": "redisLean",
    "manifestFile": "lake-manifest.json",
    "inputRev": "main",
