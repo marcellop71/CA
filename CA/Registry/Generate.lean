@@ -44,8 +44,8 @@ private def classifyStatus (env : Environment) (name : Name)
       else "proved"
 
 /-- Build a JSON entry for one declaration. -/
-private def mkEntry (env : Environment) (name : Name) (status : String) :
-    Lean.Json :=
+private def mkEntry (env : Environment) (name : Name) (status : String)
+    (description : String := "") : Lean.Json :=
   match env.find? name with
   | none => .null
   | some ci =>
@@ -70,7 +70,8 @@ private def mkEntry (env : Environment) (name : Name) (status : String) :
       ("status", .str status),
       ("type_hash", .str typeHash),
       ("pp_type", .str (toString ty)),
-      ("type_deps", .arr (typeDeps.map .str))
+      ("type_deps", .arr (typeDeps.map .str)),
+      ("description", .str description)
     ]
 
 /-- Generate registry files from the current environment.
@@ -86,16 +87,16 @@ def generateRegistryFiles (outputDir : String) : CommandElabM Unit := do
 
   let mut entries : Array Lean.Json := #[]
 
-  for (name, _) in openPoints do
-    let entry := mkEntry env name "open"
-    entries := entries.push entry
+  for (name, entry) in openPoints do
+    let e := mkEntry env name "open" entry.description
+    entries := entries.push e
 
   let mut condCount := 0
-  for (name, _) in published do
+  for (name, entry) in published do
     let status := classifyStatus env name openNameSet false
     if status == "conditional" then condCount := condCount + 1
-    let entry := mkEntry env name status
-    entries := entries.push entry
+    let e := mkEntry env name status entry.description
+    entries := entries.push e
 
   IO.FS.createDirAll outputDir
 
