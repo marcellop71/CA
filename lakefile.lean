@@ -5,10 +5,10 @@ package "ca" where
   moreLinkArgs := #["-Wl,--allow-shlib-undefined", "-lssl", "-lcrypto"]
 
 require batteries from git
-  "https://github.com/leanprover-community/batteries" @ "v4.31.0"
+  "https://github.com/leanprover-community/batteries" @ "v4.33.0"
 
 require Cli from git
-  "https://github.com/leanprover/lean4-cli" @ "v4.31.0"
+  "https://github.com/leanprover/lean4-cli" @ "v4.33.0"
 
 require redisLean from git
   "https://github.com/marcellop71/redis-lean" @ "main"
