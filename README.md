@@ -271,6 +271,7 @@ for single-declaration lookups.
 | `CA.Canonical` | L0 (pure) and L1 (MetaM) canonicalization |
 | `CA.SHA256` | SHA-256 FFI wrapper (OpenSSL EVP) |
 | `CA.ExprHash` | Expr serialization, `DeclHash`, name-based and content-based batch hashing |
+| `CA.RefHash` | `stmt` / `decl` / `ref` ids: name-free content identity per declaration (proof-irrelevant references for theorems, value-inclusive otherwise), Merkle-hashed expressions, SCC blocks for mutual/inductive families — see [`docs/ref-hash.md`](docs/ref-hash.md); tests: `lake exe refhash-test` |
 | `CA.Export` | JSON manifest, TSV edge list, summary statistics |
 | `CA.Util` | `collectConstants`, `constantKind` helpers |
 

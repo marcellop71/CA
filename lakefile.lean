@@ -32,3 +32,10 @@ extern_lib libsha256_shim pkg := do
   let obj ← sha256_shim_o.fetch
   let name := nameToStaticLib "sha256_shim"
   buildStaticLib (pkg.staticLibDir / name) #[obj]
+
+/-- Property tests for `CA.RefHash` (elaborates a small source against `Init`). -/
+lean_exe "refhash-test" where
+  root := `RefHashTest
+  supportInterpreter := true
+  -- Links the whole CA lib, whose Registry modules pull redis-lean's shim.
+  moreLinkArgs := #["-L/usr/lib/x86_64-linux-gnu", "-lhiredis", "-lhiredis_ssl", "-lssl", "-lcrypto"]
