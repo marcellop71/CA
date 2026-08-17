@@ -11,6 +11,15 @@ open CA.Export
 open CA.Util
 open Redis
 
+-- Enable execution of plain `initialize` blocks when oleans are imported.
+-- Without this, `importModules` in a compiled binary silently skips the
+-- imported modules' initializers, so persistent extensions declared with
+-- plain `initialize` (e.g. `CA.Registry`'s NameMapExtensions) never
+-- restore their entries and `@[publish]`/`@[open_point]` annotations
+-- read back as absent.
+private unsafe def enableInitImpl : IO Unit := Lean.enableInitializersExecution
+@[implemented_by enableInitImpl] private opaque enableInit : IO Unit
+
 -- Declaration collection
 
 def isInternalName (name : Name) : Bool :=
@@ -75,6 +84,7 @@ private def addLakePackagePaths : IO Unit := do
 def loadDeclarations (moduleName : Name) (extraPath : Option String := none)
     : IO (Environment × Array (Name × ConstantInfo)) := do
   IO.eprintln s!"Loading environment for {moduleName}..."
+  enableInit
   initSearchPath (← findSysroot)
   addLakePackagePaths
   if let some p := extraPath then
@@ -86,7 +96,10 @@ def loadDeclarations (moduleName : Name) (extraPath : Option String := none)
   if found.isNone then
     IO.eprintln s!"error: Module '{moduleName}' not found — no .olean file in search path.\nIf using Mathlib, run 'lake exe cache get' first to download precompiled .olean files."
     IO.Process.exit 1
-  let env ← importModules #[{module := moduleName}] {}
+  -- `loadExts := true`: restore persistent env-extension state (the
+  -- `@[publish]`/`@[open_point]` NameMapExtensions live there); the
+  -- default skips it and every annotation would read back as absent.
+  let env ← importModules #[{module := moduleName}] {} (loadExts := true)
   IO.eprintln s!"Environment loaded: {env.constants.toList.length} constants"
   let decls := collectDeclarations env
   IO.eprintln s!"Found {decls.size} declarations (excluding internal names)"
@@ -442,99 +455,28 @@ def addressCmd : Cli.Cmd := `[Cli|
 
 -- Subcommand: registry
 
-/-- Classify a declaration as proved, open, or conditional (depends on an open point). -/
-private def classifyStatus (env : Environment) (name : Name)
-    (openNames : NameSet) (isOpen : Bool) : String :=
-  if isOpen then "open"
-  else match env.find? name with
-    | none => "unknown"
-    | some ci =>
-      if (collectConstants ci.type).any openNames.contains then "conditional"
-      else "proved"
-
-/-- Build a JSON entry for one registry declaration. -/
-private def mkRegistryEntry (dh : DeclHash) (status : String) : Lean.Json :=
-  .mkObj [
-    ("name", .str dh.name.toString),
-    ("module", .str dh.module.toString),
-    ("kind", .str dh.kind),
-    ("status", .str status),
-    ("type_hash", .str dh.typeHash),
-    ("pp_type", .str dh.ppType),
-    ("type_deps", .arr (dh.typeDeps.map fun n => .str n.toString))
-  ]
-
 def runRegistryCmd (p : Cli.Parsed) : IO UInt32 := do
   let moduleName := parseModuleName p
   let outputDir := if p.hasFlag "output"
     then p.flag! "output" |>.as! String
     else "registry"
-  let levelStr := if p.hasFlag "level"
-    then p.flag! "level" |>.as! String
-    else "0"
-  let level := if levelStr == "1" then CanonLevel.l1 else CanonLevel.l0
 
   let (env, _) ← loadDeclarations moduleName (getExtraPath p)
 
-  -- Collect annotated declarations
   let openPoints := CA.Registry.getOpenPoints env
   let published := CA.Registry.getPublished env
   IO.eprintln s!"Found {openPoints.length} open points, {published.length} published"
 
-  let openNameSet := openPoints.foldl (fun acc (n, _) => acc.insert n) ({} : NameSet)
-
-  -- Gather all annotated names with their ConstantInfo
-  let mut annotated : Array (Name × ConstantInfo) := #[]
-  for (name, _) in openPoints do
-    if let some ci := env.find? name then
-      annotated := annotated.push (name, ci)
-  for (name, _) in published do
-    if let some ci := env.find? name then
-      annotated := annotated.push (name, ci)
-
-  IO.eprintln s!"Computing content addresses for {annotated.size} declarations (level={levelStr})..."
-  let hashes ← computeNameBasedHashes env annotated level
-
-  -- Build name → DeclHash map
-  let mut hashMap : Std.HashMap Name DeclHash := {}
-  for dh in hashes do
-    hashMap := hashMap.insert dh.name dh
-
-  -- Build JSON entries
-  let mut entries : Array Lean.Json := #[]
-  for (name, _) in openPoints do
-    if let some dh := hashMap.get? name then
-      entries := entries.push (mkRegistryEntry dh "open")
-  let mut condCount := 0
-  for (name, _) in published do
-    if let some dh := hashMap.get? name then
-      let status := classifyStatus env name openNameSet false
-      if status == "conditional" then condCount := condCount + 1
-      entries := entries.push (mkRegistryEntry dh status)
-
-  -- Write declarations.json
-  IO.FS.createDirAll outputDir
-  let declsPath := s!"{outputDir}/declarations.json"
-  IO.FS.writeFile declsPath (Lean.Json.arr entries).pretty
-  IO.eprintln s!"Wrote {declsPath} ({entries.size} entries)"
-
-  -- Write meta.json
-  let toolchain ← IO.FS.readFile "lean-toolchain" <&> (·.trimAscii.toString)
-  let openCount := openPoints.length
-  let pubCount := published.length
-  let metaJson := Lean.Json.mkObj [
-    ("project", .str moduleName.toString),
-    ("lean_toolchain", .str toolchain),
-    ("ca_hash_level", .str s!"L{levelStr}"),
-    ("open_points", .num ⟨openCount, 0⟩),
-    ("published", .num ⟨pubCount, 0⟩),
-    ("conditional", .num ⟨condCount, 0⟩),
-    ("proved", .num ⟨pubCount - condCount, 0⟩)
-  ]
-  let metaPath := s!"{outputDir}/meta.json"
-  IO.FS.writeFile metaPath metaJson.pretty
-  IO.eprintln s!"Wrote {metaPath}"
-  IO.eprintln s!"Summary: {openCount} open, {pubCount - condCount} proved, {condCount} conditional"
+  -- Same generation core as the `#ca_registry` command: both paths must
+  -- produce byte-identical registries.
+  let toolchain ← try
+      pure (some (← IO.FS.readFile "lean-toolchain").trimAscii.toString)
+    catch _ => pure none
+  let s ← CA.Registry.generateRegistryCore env outputDir
+    (project := moduleName.toString) (toolchain := toolchain)
+  IO.eprintln s!"Wrote {s.declsPath} ({s.entries} entries)"
+  IO.eprintln s!"Wrote {s.metaPath}"
+  IO.eprintln s!"Summary: {s.openPoints} open, {s.published - s.conditional} proved, {s.conditional} conditional"
   return 0
 
 def registryCmd : Cli.Cmd := `[Cli|
@@ -545,7 +487,6 @@ def registryCmd : Cli.Cmd := `[Cli|
     m, module : String; "Module to load (default: Mathlib)"
     p, path : String; "Extra search path for .olean files"
     o, output : String; "Output directory (default: registry)"
-    level : String; "Normalization level: 0 or 1 (default: 0)"
 ]
 
 -- Top-level CLI

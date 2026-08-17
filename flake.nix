@@ -11,12 +11,25 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # Platform-specific Lean 4 binary
-        leanVersion = "4.29.0";
-        leanPlatform = if pkgs.stdenv.isDarwin then "darwin" else "linux";
-        leanSha256 = if pkgs.stdenv.isDarwin
-          then "sha256-/6y9ZMYLzJBY42kL4/93fZMloIx5XLuyduUPq10GYRo="
-          else "sha256-CJ9+UT7T6UNtGR9JhjMMC1OAnIa1mX9et/JVUMN0+kg=";
+        # Lean 4 release binary. Keep `leanVersion` equal to
+        # `lean-toolchain` (leanprover/lean4:v4.33.0) and refresh the
+        # four hashes together:
+        #   curl -sL https://github.com/leanprover/lean4/releases/download/v$V/lean-$V-$P.tar.zst \
+        #     | sha256sum | cut -d' ' -f1 | xxd -r -p | base64      # → sha256-…
+        # (or `nix hash file` on the downloaded tarball).
+        leanVersion = "4.33.0";
+        leanPlatform = {
+          "x86_64-linux"   = "linux";
+          "aarch64-linux"  = "linux_aarch64";
+          "x86_64-darwin"  = "darwin";
+          "aarch64-darwin" = "darwin_aarch64";
+        }.${system} or (throw "CA: no Lean release tarball for ${system}");
+        leanSha256 = {
+          "linux"          = "sha256-Sz+wPCmh4KJT+x0R+brjcl8ZoNxvwJs+oW0snfM0niw=";
+          "linux_aarch64"  = "sha256-+WGkF8uhC26gqdE2cS1ZUoE4F//WaABB8JojNSb4A6k=";
+          "darwin"         = "sha256-GMSt/S5FOMNmj34HDojHohV23un730beffLvFsl//vM=";
+          "darwin_aarch64" = "sha256-21J0tmm+JwrwSLXk8eDOVx32dQ5BGVaz4eb8wgEkEMI=";
+        }.${leanPlatform};
 
         lean4Bin = pkgs.stdenv.mkDerivation {
           pname = "lean4";
@@ -36,28 +49,35 @@
             cp -r lean-${leanVersion}-${leanPlatform}/* $out/
           '';
         };
-        leanBin = lean4Bin;
-        lakeBin = lean4Bin;
 
         # Library path variable name (different on Darwin vs Linux)
         libPathVar = if pkgs.stdenv.isDarwin then "DYLD_LIBRARY_PATH" else "LD_LIBRARY_PATH";
 
-        # Native C dependencies for CA library and CLI
-        nativeDeps = [
-          pkgs.openssl    # sha256_shim.c FFI + linking (-lssl -lcrypto)
-          pkgs.hiredis    # redis-lean linking (-lhiredis -lhiredis_ssl)
-          pkgs.zlog       # zlog-lean linking (-lzlog)
-          pkgs.arrow-cpp  # arrow-lean FFI
-          pkgs.gmp        # Lean runtime
+        # Native dependencies.
+        #   CA library : OpenSSL (CA/sha256/sha256_shim.c; -lssl -lcrypto)
+        #   ca CLI     : hiredis + zlog, pulled in by redis-lean / zlog-lean
+        #                (the library never imports them — see README,
+        #                "Building")
+        # arrow-cpp was dropped with arrow-lean (no longer a dependency).
+        libDeps = [
+          pkgs.openssl
+          pkgs.hiredis
+          pkgs.zlog
         ];
+        nativeDeps = libDeps ++ [ pkgs.gmp pkgs.libuv ];   # Lean runtime
 
+        # Lake's link lines name the Ubuntu paths
+        # (`-L/usr/lib/x86_64-linux-gnu`, `-L/usr/local/lib`); inside the
+        # shell the same libraries are found through LIBRARY_PATH and the
+        # stray `-L` flags are harmless.
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = nativeDeps ++ [
-            leanBin
-            lakeBin
+            lean4Bin
             pkgs.clang
             pkgs.lld
+            pkgs.git       # lake fetches the git requires
+            pkgs.redis     # `redis-server` for the ca CLI's fetch/address (optional)
           ];
 
           LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeDeps;
@@ -66,12 +86,10 @@
             pkgs.hiredis
             pkgs.zlog
           ];
-          CPLUS_INCLUDE_PATH = "${pkgs.arrow-cpp}/include";
 
           shellHook = ''
             export ${libPathVar}="${pkgs.lib.makeLibraryPath nativeDeps}"
-            echo "CA development environment"
-            echo "Lean version: $(lean --version 2>/dev/null || echo 'Lean not found')"
+            echo "CA development environment — Lean $(lean --version 2>/dev/null | sed 's/^Lean (version //; s/,.*//' || echo 'not found'), toolchain pin $(cat lean-toolchain 2>/dev/null)"
           '';
         };
       }

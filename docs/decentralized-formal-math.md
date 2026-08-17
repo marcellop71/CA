@@ -216,7 +216,7 @@ Add to your `lakefile.lean`:
 
 ```lean
 require ca from git
-  "https://github.com/marcellop71/CA" @ "main"
+  "https://github.com/marcellop71/CA" @ "v0.1.0"
 ```
 
 ## Declaration status lifecycle

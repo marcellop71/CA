@@ -160,13 +160,15 @@ structure DeclHash where
   valueDeps  : Array Name      -- constants referenced in the value
   deriving Inhabited
 
-/-- Resolve the module that owns a declaration, or `.anonymous` if not found. -/
+/-- Resolve the module that owns a declaration. Declarations with no
+    module index belong to the module currently being elaborated, so the
+    fallback is `env.mainModule` (`.anonymous` only when that is unset). -/
 def getModuleName (env : Environment) (name : Name) : Name :=
   match env.getModuleIdxFor? name with
   | some idx =>
     let mods := env.allImportedModuleNames
-    if h : idx.toNat < mods.size then mods[idx.toNat] else .anonymous
-  | none => .anonymous
+    if h : idx.toNat < mods.size then mods[idx.toNat] else env.mainModule
+  | none => env.mainModule
 
 /-! ## Topological Sort for Content-Based Hashing -/
 

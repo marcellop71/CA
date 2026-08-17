@@ -1,5 +1,14 @@
 # Content Addressing
 
+> **Scope note (2026-08).** This document describes the `address`
+> subcommand and the *name-based* / *content-based* hashing modes it
+> exposes. The identity scheme CA now recommends — the three ids
+> `stmt` / `decl` / `ref`, in which references are embedded by their
+> own ids and mutual/inductive families hash as one SCC — is
+> [`ref-hash.md`](ref-hash.md). Read that first if you are looking for
+> "what is a declaration's address"; read this one for the
+> canonicalisation levels (shared by both) and for the batch tooling.
+
 The `address` subcommand computes a content address for every declaration in the environment. A content address identifies a declaration by its mathematical content rather than its human-chosen name. Two declarations with different names but identical mathematical content receive the same address.
 
 ## Overview
@@ -19,7 +28,7 @@ Canonicalization transforms an `Expr` so that expressions that differ only in ir
 
 Level 0 is pure (no `MetaM`) and ensures alpha-equivalence:
 
-- **Universe parameter renaming.** Universe parameters are renamed to positional indices (`u_0`, `u_1`, ...) based on first-occurrence order in the expression. This ensures `theorem foo.{u, v} : ...` and `theorem bar.{α, β} : ...` with the same body get the same address.
+- **Universe parameter renaming.** Universe parameters are renamed to positional indices (`u_0`, `u_1`, ...) based on first-occurrence order in the expression. This ensures `theorem foo.{u, v} : ...` and `theorem bar.{α, β} : ...` with the same body get the same address. (`RefHash` instead renames a declaration's parameters positionally from its `levelParams` binder list, which additionally keeps the binder *order* and the type↔value parameter correlation — see [`ref-hash.md`](ref-hash.md).)
 - **Metadata stripping.** `.mdata` annotations are removed. These carry source-location and elaboration metadata that is irrelevant to mathematical content.
 - **Binder names.** Lean 4 `Expr` uses de Bruijn indices for bound variables, so alpha-equivalence is already built in. Binder names do not affect the hash.
 

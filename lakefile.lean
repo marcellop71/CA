@@ -5,13 +5,15 @@ package "ca" where
   moreLinkArgs := #["-Wl,--allow-shlib-undefined", "-lssl", "-lcrypto"]
 
 require batteries from git
-  "https://github.com/leanprover-community/batteries" @ "v4.31.0"
+  "https://github.com/leanprover-community/batteries" @ "v4.33.0"
 
 require Cli from git
-  "https://github.com/leanprover/lean4-cli" @ "v4.31.0"
+  "https://github.com/leanprover/lean4-cli" @ "v4.33.0"
 
+-- Needed only by the `ca` CLI executable (`fetch`/`address` store to
+-- Redis); the CA library never imports it.
 require redisLean from git
-  "https://github.com/marcellop71/redis-lean" @ "main"
+  "https://github.com/marcellop71/redis-lean" @ "v4.33.0-2"
 
 @[default_target]
 lean_lib CA where
@@ -19,7 +21,14 @@ lean_lib CA where
 
 lean_exe "ca" where
   root := `Main
-  moreLinkArgs := #["-lhiredis", "-lhiredis_ssl"]
+  supportInterpreter := true
+  -- supportInterpreter makes undefined symbols fatal at link time, so the
+  -- native deps of the transitive redis-lean/zlog-lean shims must be
+  -- resolved here explicitly.
+  moreLinkArgs := #[
+    "-L/usr/lib/x86_64-linux-gnu", "-lhiredis", "-lhiredis_ssl",
+    "-L/usr/local/lib", "-Wl,-rpath,/usr/local/lib", "-lzlog",
+    "-lssl", "-lcrypto"]
 
 target sha256_shim_o pkg : FilePath := do
   let oFile := pkg.buildDir / "c" / "sha256_shim.o"
@@ -32,3 +41,10 @@ extern_lib libsha256_shim pkg := do
   let obj ← sha256_shim_o.fetch
   let name := nameToStaticLib "sha256_shim"
   buildStaticLib (pkg.staticLibDir / name) #[obj]
+
+/-- Property tests for `CA.RefHash` (elaborates a small source against `Init`). -/
+lean_exe "refhash-test" where
+  root := `RefHashTest
+  supportInterpreter := true
+  -- Links the whole CA lib, whose Registry modules pull redis-lean's shim.
+  moreLinkArgs := #["-L/usr/lib/x86_64-linux-gnu", "-lhiredis", "-lhiredis_ssl", "-lssl", "-lcrypto"]

@@ -30,30 +30,50 @@ partial def collectLevelParams (l : Level)
   | .zero => (seen, order)
   | .mvar _ => (seen, order)
 
-/-- Walk an `Expr` to collect all universe parameter names in first-occurrence order. -/
+/-- Walk an `Expr` to collect all universe parameter names in
+    first-occurrence order.
+
+    Sharing-aware: a subterm that has already been visited (structurally
+    equal, `ExprStructEq`) contributes nothing new, so it is skipped, and a subterm without
+    level parameters (`Expr.hasLevelParam`) is not entered at all. The
+    order of first occurrences is exactly the plain DFS order — the
+    result is identical to a naive walk, but the cost is the size of the
+    DAG rather than of the unfolded tree (the naive walk was exponential
+    on `omega`/`decide` proof terms). -/
 partial def collectExprUnivParams (e : Expr)
     (seen : Std.HashSet Name) (order : Array Name) : Std.HashSet Name × Array Name :=
-  match e with
-  | .const _ levels =>
-    levels.foldl (fun (seen, order) l => collectLevelParams l seen order) (seen, order)
-  | .sort level =>
-    collectLevelParams level seen order
-  | .app f a =>
-    let (seen, order) := collectExprUnivParams f seen order
-    collectExprUnivParams a seen order
-  | .lam _ ty body _ =>
-    let (seen, order) := collectExprUnivParams ty seen order
-    collectExprUnivParams body seen order
-  | .forallE _ ty body _ =>
-    let (seen, order) := collectExprUnivParams ty seen order
-    collectExprUnivParams body seen order
-  | .letE _ ty value body _ =>
-    let (seen, order) := collectExprUnivParams ty seen order
-    let (seen, order) := collectExprUnivParams value seen order
-    collectExprUnivParams body seen order
-  | .mdata _ e => collectExprUnivParams e seen order
-  | .proj _ _ e => collectExprUnivParams e seen order
-  | _ => (seen, order)
+  let (_, seen, order) := go e {} seen order
+  (seen, order)
+where
+  go (e : Expr) (visited : Std.HashSet ExprStructEq) (seen : Std.HashSet Name) (order : Array Name)
+      : Std.HashSet ExprStructEq × Std.HashSet Name × Array Name :=
+    if !e.hasLevelParam then (visited, seen, order)
+    else if visited.contains ⟨e⟩ then (visited, seen, order)
+    else
+      let visited := visited.insert ⟨e⟩
+      match e with
+      | .const _ levels =>
+        let (seen, order) := levels.foldl (fun (seen, order) l => collectLevelParams l seen order) (seen, order)
+        (visited, seen, order)
+      | .sort level =>
+        let (seen, order) := collectLevelParams level seen order
+        (visited, seen, order)
+      | .app f a =>
+        let (visited, seen, order) := go f visited seen order
+        go a visited seen order
+      | .lam _ ty body _ =>
+        let (visited, seen, order) := go ty visited seen order
+        go body visited seen order
+      | .forallE _ ty body _ =>
+        let (visited, seen, order) := go ty visited seen order
+        go body visited seen order
+      | .letE _ ty value body _ =>
+        let (visited, seen, order) := go ty visited seen order
+        let (visited, seen, order) := go value visited seen order
+        go body visited seen order
+      | .mdata _ e => go e visited seen order
+      | .proj _ _ e => go e visited seen order
+      | _ => (visited, seen, order)
 
 /-- Build canonical mapping: first occurrence → `u_0`, `u_1`, ... -/
 def buildCanonicalUnivMapping (params : Array Name) : Std.HashMap Name Name := Id.run do
@@ -71,48 +91,74 @@ partial def canonicalizeLevel (l : Level) (mapping : Std.HashMap Name Name) : Le
   | .imax l1 l2 => .imax (canonicalizeLevel l1 mapping) (canonicalizeLevel l2 mapping)
   | l => l
 
-/-- Apply canonical universe mapping throughout an `Expr`. Also strips `.mdata`. -/
+/-- Apply canonical universe mapping throughout an `Expr`. Also strips
+    `.mdata`. Implemented with `Expr.replace` (the runtime's cached,
+    sharing-preserving traversal): unchanged subterms are the same
+    objects as in the input, so a DAG-shaped proof term stays a DAG. -/
 partial def canonicalizeExprUnivs (e : Expr) (mapping : Std.HashMap Name Name) : Expr :=
-  match e with
-  | .const name levels =>
-    .const name (levels.map fun l => canonicalizeLevel l mapping)
-  | .sort level => .sort (canonicalizeLevel level mapping)
-  | .app f a =>
-    .app (canonicalizeExprUnivs f mapping) (canonicalizeExprUnivs a mapping)
-  | .lam n ty body bi =>
-    .lam n (canonicalizeExprUnivs ty mapping) (canonicalizeExprUnivs body mapping) bi
-  | .forallE n ty body bi =>
-    .forallE n (canonicalizeExprUnivs ty mapping) (canonicalizeExprUnivs body mapping) bi
-  | .letE n ty value body nd =>
-    .letE n (canonicalizeExprUnivs ty mapping)
-           (canonicalizeExprUnivs value mapping)
-           (canonicalizeExprUnivs body mapping) nd
-  | .mdata _ e => canonicalizeExprUnivs e mapping
-  | .proj t i e => .proj t i (canonicalizeExprUnivs e mapping)
-  | e => e
+  e.replace fun s => match s with
+    | .const name levels =>
+      some (.const name (levels.map fun l => canonicalizeLevel l mapping))
+    | .sort level => some (.sort (canonicalizeLevel level mapping))
+    | .mdata _ inner => some (canonicalizeExprUnivs inner mapping)
+    | _ => none
+
+/-- Strip `.mdata` recursively without changing anything else
+    (sharing-preserving, via `Expr.replace`). -/
+partial def stripMData (e : Expr) : Expr :=
+  e.replace fun s => match s with
+    | .mdata _ inner => some (stripMData inner)
+    | _ => none
 
 /-- Level 0 canonicalization (pure):
     1. Collect universe params in first-occurrence order
     2. Rename to positional names (u_0, u_1, ...)
-    3. Strip `.mdata` annotations -/
+    3. Strip `.mdata` annotations
+
+    Every step preserves sharing (see the helpers above); the previous
+    implementation rebuilt the whole unfolded tree, which for a
+    DAG-shaped proof term of a few million shared nodes meant tens of
+    gigabytes of fresh `Expr` nodes — the memory blow-up that killed the
+    first schema-v3 store rebuild (2026-08-18). -/
 def canonicalizeL0 (e : Expr) : Expr :=
-  let (_, params) := collectExprUnivParams e {} #[]
-  if params.isEmpty then
-    -- No universe params, just strip mdata
+  if !e.hasLevelParam then
     stripMData e
   else
-    let mapping := buildCanonicalUnivMapping params
+    let (_, params) := collectExprUnivParams e {} #[]
+    if params.isEmpty then
+      stripMData e
+    else
+      let mapping := buildCanonicalUnivMapping params
+      canonicalizeExprUnivs e mapping
+
+/-- L0 canonicalization for the expressions of a *declaration* whose
+    universe binder list is `levelParams`: parameters are renamed
+    positionally (`levelParams[i] ↦ u_i`) and `.mdata` is stripped.
+
+    First-occurrence renaming (`canonicalizeL0`) is the right notion for a
+    free-standing expression, but for a declaration it forgets which binder
+    position each parameter occupies — and use sites instantiate levels
+    positionally. Independent first-occurrence renaming made
+    `def q1.{u,v} : F u v` and `def q2.{u,v} : F v u` collide even though
+    `q1.{a,b}` and `q2.{a,b}` have different types (and it lost the
+    type↔value parameter correlation, since the two were renamed
+    independently). Positional renaming keeps identity invariant under
+    renaming the binders while staying sensitive to their order — exactly
+    the α-equivalence of universe-polymorphic declarations.
+
+    Parameters occurring in `e` but missing from `levelParams` (ill-formed
+    input; the kernel would reject it) are appended in first-occurrence
+    order, so the function is total and deterministic. -/
+def canonicalizeL0Decl (levelParams : List Name) (e : Expr) : Expr :=
+  if !e.hasLevelParam then
+    stripMData e
+  else
+    let declared := levelParams.toArray
+    let (_, occurring) := collectExprUnivParams e {} #[]
+    let declaredSet : Std.HashSet Name := declared.foldl (·.insert ·) {}
+    let extra := occurring.filter (!declaredSet.contains ·)
+    let mapping := buildCanonicalUnivMapping (declared ++ extra)
     canonicalizeExprUnivs e mapping
-where
-  /-- Strip `.mdata` recursively without changing anything else. -/
-  stripMData : Expr → Expr
-    | .mdata _ e => stripMData e
-    | .app f a => .app (stripMData f) (stripMData a)
-    | .lam n t b bi => .lam n (stripMData t) (stripMData b) bi
-    | .forallE n t b bi => .forallE n (stripMData t) (stripMData b) bi
-    | .letE n t v b nd => .letE n (stripMData t) (stripMData v) (stripMData b) nd
-    | .proj t i e => .proj t i (stripMData e)
-    | e => e
 
 /-! ## Level 1 Canonicalization (MetaM)
 

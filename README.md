@@ -2,33 +2,80 @@
 
 ### Warning: this is an early prototype, still subject to conceptual and implementation flaws and API churn.
 
-Content-addressed hashing and decentralized registry for Lean 4
-declarations. Assigns a stable SHA-256 identity to every declaration based
-on its mathematical content (type structure), not its human-chosen name,
-file, or project.
+Content-addressed identity for Lean 4 declarations: a SHA-256 address
+derived from what a declaration *is* — its elaborated type and value,
+with everything it references addressed the same way — rather than from
+the name, file or project it happens to live in.
 
-Two declarations with different names but identical mathematical content
-receive the same address.
+Two declarations with different names but identical mathematical
+content receive the same address. A declaration whose statement quietly
+changes — because a constant it mentions was redefined — does not.
 
-## Why
+## What it is for
 
-Lean declarations are identified by name — a human-chosen path like
-`Finset.sum_comm`. Renaming, moving, or reorganizing a library breaks all
-downstream references, even though the mathematics hasn't changed.
+The unit a mathematician cares about is a result, not a file. CA makes
+that unit addressable, which is what the following need:
 
-The underlying issue is conceptual: **one should import a result, not a
-file.** A mathematician using a lemma does not care which file it lives in,
-which project hosts it, or what namespace convention was chosen. What
-matters is the mathematical content — the statement itself.
+- **Referencing a result you cannot locate.** You know the statement;
+  you do not know the repository, package, module or revision that
+  holds it. A statement id is computable from the proposition alone, by
+  anyone, without knowing who proved it.
+- **Asking "has this already been proved?"** Two libraries that prove
+  the same theorem produce the same statement id, so duplication is a
+  lookup rather than a literature search. This is the question an agent
+  must answer both before starting work and before offering it back.
+- **Citing across refactors.** Renaming a declaration, moving it
+  between files, reorganising namespaces, or renaming anything it
+  references leaves its address unchanged.
+- **Knowing when a statement was weakened.** Because a reference is
+  embedded by *its own* address, a redefined constant produces a
+  different statement id. "This proves the same thing it did before" is
+  a comparison of two hashes.
+- **Alternative proofs as first-class objects.** Two proofs of one
+  theorem share a statement id and differ in their declaration id, so a
+  store can hold both instead of overwriting one with the other.
+- **Incremental work that stops where mathematics stops.** Since a
+  dependent embeds a theorem's *statement*, re-proving a theorem
+  invalidates nothing downstream; changing a definition's value
+  invalidates everything that could unfold it.
+- **Metadata that follows the statement.** A LaTeX rendering, a prose
+  description or a translation belongs to a statement, not to a file
+  path — keyed by statement id it is written once and shared by every
+  proof of it and every project that uses it.
+- **Decentralised publication.** Addresses are computed, not assigned:
+  no registrar, no coordination, and anyone can verify by re-hashing.
 
-Content addresses decouple identity from naming:
+CA is the addressing layer only. Building a store, a verifier or a
+registry on top of it is a separate concern — see *Related work* below.
 
-- **Stable** — refactors don't break addresses if the math is unchanged
-- **Universal** — no project, file, or import context required
-- **Cross-project** — shared key space across the entire ecosystem
-- **Decentralized** — no central authority; anyone can verify by re-hashing
+## The identity: three ids per declaration
 
-See [paper/main.pdf](paper/main.pdf) for the full motivation.
+`CA.RefHash` computes, for every declaration, three ids over canonical
+serialisations in which each referenced constant is replaced by its own
+id (names never enter) and mutual or inductive families are hashed as
+one strongly connected component:
+
+| id | of what | answers |
+|----|---------|---------|
+| `stmt` | the type, with universe arity | *what does this claim?* |
+| `decl` | the whole `ConstantInfo` — kind, flags, type, value, structural fields | *which declaration is this, exactly?* |
+| `ref` | `stmt` for theorems, `decl` otherwise | *what may a dependent rely on?* |
+
+`ref` is the interesting one. A dependent of a theorem can observe only
+its statement — by proof irrelevance no term can distinguish two proofs
+of one proposition — while a dependent of a definition may unfold it.
+Embedding `ref` therefore makes identity propagate exactly as far as
+mathematical dependence does.
+
+The price is exactness with respect to the toolchain: because
+references are by id, a change in Lean's core propagates upward. The
+older name-based hash below was stable across releases precisely
+because it was blind to what a name pointed at.
+
+See [`docs/ref-hash.md`](docs/ref-hash.md) for the full construction,
+and `lake exe refhash-test` for the properties it is tested against
+(α-renaming invariance, proof irrelevance, value sensitivity, blocks,
+determinism, order independence).
 
 ## How it works
 
@@ -46,15 +93,17 @@ Two canonicalization levels:
 | L0 (default) | Universe renaming + mdata stripping | Pure |
 | L1 | L0 + reducible-transparency `whnf` normalization | MetaM |
 
-Two hashing modes:
+`CA.ExprHash` also keeps two older, weaker hashing modes, still used
+for indexing and for compatibility with addresses computed before
+`RefHash` existed:
 
 | Mode | `.const` references become | Effect |
 |------|---------------------------|--------|
-| Name-based (default) | The declaration's `Name` string | Fast, stable within a single library |
-| Content-based (Merkle DAG) | The 32-byte content hash of the dependency | True content identity across libraries |
+| Name-based | The declaration's `Name` string | Fast and stable across toolchains, but blind: two libraries whose `IsSolvable` differ hash a theorem about it identically |
+| Content-based (Merkle DAG) | The 32-byte content hash of the dependency's *type* | Content identity across libraries, but type-only: every definition of a given type collides |
 
-For theorems, the value hash is the sentinel `PROOF_IRRELEVANT` — identity
-is determined by what is proved, not how.
+`CA.RefHash` supersedes both for identity purposes; the name-based hash
+is worth keeping as a coarse, version-spanning handle.
 
 See [docs/address.md](docs/address.md) for the full addressing design.
 
@@ -70,9 +119,17 @@ the union of all project-local registries — no central server required.
 - **Discovery** is a curated `sources.json` listing known repos
 
 Authors annotate their code with `@[publish]` and `@[open_point]`
-attributes. A generation command (not yet implemented) will scan the
-environment, compute content addresses, classify declaration status
-(proved / open / conditional), and write the registry folder.
+attributes; `#ca_registry` (or `ca registry`) scans the environment,
+computes content addresses, classifies each declaration (proved / open
+/ conditional) and writes the registry folder during `lake build`.
+Both paths share one generation core and produce byte-identical
+registries (hashing is a pure-Lean SHA-256, `sha256Pure`, since the
+FFI is unavailable to code interpreted during elaboration); attribute
+descriptions are recorded in `declarations.json`.
+Resolution from the other side — `use`, `resolve%`, and reading other
+projects' registries through `sources.json` — is designed but not yet
+implemented, so today the registry is publishable but not yet
+consumable.
 
 See [docs/registry-design.md](docs/registry-design.md) for the full
 registry architecture.
@@ -88,8 +145,12 @@ In your project's `lakefile.lean`:
 
 ```lean
 require ca from git
-  "https://github.com/marcellop71/CA" @ "main"
+  "https://github.com/marcellop71/CA" @ "v0.1.0"
 ```
+
+Tags are release versions (the current release builds on Lean
+`v4.33.0`; see `lean-toolchain`); use `@ "main"` if you are following
+development.
 
 Then fetch dependencies:
 
@@ -202,7 +263,7 @@ PR.
 
 ```
 my-project/
-├── lakefile.lean                  # require ca from git "..." @ "main"
+├── lakefile.lean                  # require ca from git "..." @ "v0.1.0"
 ├── MyProject/
 │   ├── Definitions.lean           # @[open_point] annotations
 │   └── Theorems.lean              # @[publish] annotations
@@ -247,7 +308,8 @@ ca address --name Nat.add_comm
 
 Generates `declarations.json` and `meta.json` from `@[publish]` and
 `@[open_point]` annotations. Standalone alternative to `#ca_registry` for
-environments where the CA binary shares the same toolchain and search paths.
+environments where the CA binary shares the same toolchain and search
+paths — the two produce byte-identical output.
 
 ### `fetch`
 
@@ -268,9 +330,11 @@ for single-declaration lookups.
 
 | Module | Description |
 |--------|-------------|
-| `CA.Canonical` | L0 (pure) and L1 (MetaM) canonicalization |
-| `CA.SHA256` | SHA-256 FFI wrapper (OpenSSL EVP) |
+| `CA.Canonical` | L0 (pure) and L1 (MetaM) canonicalization; positional universe renaming for declarations |
+| `CA.SHA256` | SHA-256 FFI wrapper (OpenSSL EVP) + `sha256Pure` (pure Lean, same digests, for interpreted contexts) |
+| `CA.Base58` | base58btc encode/decode for id rendering |
 | `CA.ExprHash` | Expr serialization, `DeclHash`, name-based and content-based batch hashing |
+| `CA.RefHash` | `stmt` / `decl` / `ref` ids: name-free content identity per declaration (proof-irrelevant references for theorems, value-inclusive otherwise), Merkle-hashed expressions, SCC blocks for mutual/inductive families — see [`docs/ref-hash.md`](docs/ref-hash.md); tests: `lake exe refhash-test` |
 | `CA.Export` | JSON manifest, TSV edge list, summary statistics |
 | `CA.Util` | `collectConstants`, `constantKind` helpers |
 
@@ -283,6 +347,92 @@ for single-declaration lookups.
 | `CA.Registry.Generate` | implemented | `#ca_registry` command: status classification, content hashing, JSON output |
 | `CA.Registry.Resolve` | not yet | `use`, `use!`, `resolve%` elaborators |
 | `CA.Registry.Sources` | not yet | `sources.json` parsing, remote registry fetching, local cache |
+
+## Where this is used, and what it is not
+
+CA is the addressing layer. It computes ids and can generate a
+project-local registry folder; it does not store declarations, run the
+kernel, or serve queries.
+
+- [declbuild](https://github.com/proofinity-it) builds on it: a
+  declaration-granular store keyed by these ids, a kernel re-checker
+  that re-verifies a stored declaration against an explicitly trusted
+  cone, statement-keyed annotations, and a registry whose unit of
+  sharing is a declaration rather than a repository. Public release
+  intended shortly.
+
+### Related work
+
+[LeanArchitect](https://github.com/hanwenzhu/LeanArchitect) (Zhu, ITP
+2026) predates this repository and is worth reading before this one. It
+extracts a *blueprint* — the informal-statement dependency graph that
+[leanblueprint](https://github.com/PatrickMassot/leanblueprint) projects
+plan with — directly from Lean source: declarations carry a
+`@[blueprint]` attribute, the edges between nodes are inferred from the
+elaborated declarations instead of being maintained by hand in LaTeX,
+and the result is exported as JSON and LaTeX with progress trackable by
+humans and by provers. It does two things this library does not: it
+keeps a human-authored mathematical narrative attached to formal code,
+and it fits a workflow mathematicians already use.
+
+It is complementary rather than competing. A blueprint node is
+identified by name plus an author-chosen label and lives in one
+repository, so it is exactly as portable as that project's names; a
+content address belongs to no repository but authors nothing. If a
+blueprint node recorded the statement ids of the declarations that
+discharge it, the node would survive renames and become comparable
+across projects — and its informal text is the best available content
+for anything keyed by statement rather than by file path.
+
+### What an address covers, and what it cannot
+
+An address is a hash of a *canonical form*, so the honest question is
+never "is it exact?" but "what does the canonical form erase?".
+
+**Erased by construction (L0).** Binder names (de Bruijn), universe
+parameter names (renamed positionally from the declaration's universe
+binder list — renaming binders is erased, reordering them is not,
+since use sites instantiate levels positionally), `mdata` and source
+positions, the
+declaration's own name, and — because `RefHash` embeds each reference
+by *its* id — the names of everything it refers to, wherever those live
+and however they were later renamed or moved. Two structurally
+identical declarations therefore coincide even across libraries, under
+whatever names each of them chose. For a *reference* to a theorem the
+proof is erased as well, by proof irrelevance, so re-proving a theorem
+changes nothing for anything that uses it.
+
+**Erased with L1.** Reducible-transparency `whnf` before hashing:
+`abbrev`s, `@[reducible]` definitions and type synonyms collapse, so
+statements that differ only by such a synonym share an address.
+
+**Not erased today, but reachable by more normalisation.** Binder info
+currently enters the hash, and a level that ignored it would merge API
+variants stating the same proposition. Unfolding at *default*
+transparency would merge more; Lean's kernel decides that equality
+pairwise, but hashing needs a canonical representative, and normalising
+at default transparency neither terminates cheaply nor stays stable
+across library refactors — which is why L1 stops at reducible.
+Structure-eta and instance-argument normalisation sit in the same
+category: possible, each with a cost in time and in false merges.
+
+**Not reachable by any normal form.** Two genuinely different
+formalisations of the same mathematics are related by a *proof*, not by
+a normal form, and finding that proof is theorem proving. No hashing
+scheme will merge them, and one that appeared to would be lying.
+
+The productive way to cover that last case is to record it rather than
+hash it: a proof of `A ↔ B` is itself a declaration with its own
+address, so "these two statements are equivalent, and here is the
+term that shows it" becomes ordinary data in the same store, checkable
+by the same kernel. Search layers (type fingerprints, embeddings) can
+propose such links; only a proof establishes one.
+
+**Operationally**: identity is exact with respect to the toolchain's
+core, since references are by id — a change in Lean's core propagates
+upward, where the older name-based hash was stable precisely because it
+was blind. And computing ids for a whole Mathlib-sized environment is a
+single-threaded pass of minutes, worth caching.
 
 ## Building
 
@@ -297,8 +447,12 @@ lake build     # build the CA library
 lake build ca  # build the CLI executable (requires Redis native libs)
 ```
 
-The Nix flake provides Lean 4, OpenSSL, hiredis, and all other native
-dependencies. Works on Linux and macOS.
+The Nix flake provides the Lean 4 release binary pinned to the same
+version as `lean-toolchain` (v4.33.0; x86_64 and aarch64, Linux and
+macOS), OpenSSL for the library, and hiredis + zlog for the CLI's
+redis-lean / zlog-lean shims. When bumping the toolchain, bump
+`leanVersion` and the four tarball hashes in `flake.nix` together (the
+recipe is in the file).
 
 ### Without Nix (Ubuntu/Debian)
 
@@ -331,5 +485,14 @@ lake build ca
 | [lean4-cli](https://github.com/leanprover/lean4-cli) | CLI only | CLI argument parsing |
 | [redis-lean](https://github.com/marcellop71/redis-lean) | CLI only | Redis FFI (hiredis) for `fetch`/`address` commands |
 
-Lean toolchain: `leanprover/lean4:v4.29.0-rc1`
+`redis-lean` is a dependency of the **`ca` CLI executable only** — the
+`fetch` and `address` subcommands use it to store and look up addresses
+in Redis. The `CA` library never imports it, so a downstream project
+that `require`s `ca` fetches the package (Lake has no per-target
+dependencies) but never builds or links it, and needs neither Redis nor
+hiredis installed.
+
+Lean toolchain: `leanprover/lean4:v4.33.0` (see `lean-toolchain`;
+`batteries` / `Cli` are pinned to the matching releases). This
+repository's own tags are release versions (`v0.1.0`, ...).
 
