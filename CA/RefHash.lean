@@ -497,12 +497,24 @@ def computeIds (decls : Array (Name × ConstantInfo)) (base : RefTable := {})
     decls.foldl (fun m (n, ci) => m.insert n (refsOf ci).toArray) {}
   let succ (n : Name) : Array Name := refsCache.getD n #[]
   let comps := sccs names succ
-  let tableRef ← IO.mkRef base
+  -- `table` is a plain local: every closure that captures it must be
+  -- dead before it is mutated, or the insert copies the whole map (an
+  -- `IO.Ref` shared with a live local had exactly that effect: one full
+  -- copy per block member — quadratic on Mathlib).
+  let mut table : RefTable := base
   let shared : SharedMemo ← IO.mkRef {}
   let mut results : Std.HashMap Name DeclIds := {}
+  -- Optional trace (`CA_REFHASH_TRACE=1`): progress every 20k components
+  -- and every component that takes more than a second, on stderr.
+  let trace := (← IO.getEnv "CA_REFHASH_TRACE").isSome
+  let tStart ← IO.monoMsNow
+  let mut done : Nat := 0
+  let mut slowest : Nat := 0
+  if trace then
+    IO.eprintln s!"refhash: {decls.size} decls, {comps.size} components (sccs {(← IO.monoMsNow) - tStart} ms)"
 
   for comp in comps do
-    let table ← tableRef.get
+    let tComp ← IO.monoMsNow
     let selfLoop := comp.size == 1 && (succ comp[0]!).contains comp[0]!
     if comp.size == 1 && !selfLoop then
       -- Standalone declaration.
@@ -522,7 +534,7 @@ def computeIds (decls : Array (Name × ConstantInfo)) (base : RefTable := {})
       results := results.insert n {
         name := n, stmt := s, decl := d, ref := r,
         unresolved := st.unresolved.toArray }
-      tableRef.modify (·.insert n r)
+      table := table.insert n r
     else
       -- Block: canonical member order, then block hash, then member ids.
       -- Shape hash: member encoding with intra-block references made
@@ -572,27 +584,36 @@ def computeIds (decls : Array (Name × ConstantInfo)) (base : RefTable := {})
         | none => match table.get? m with
           | some r => .id r
           | none => .byName m
-      -- Block hash.
-      let mut blockBuf := pushNat (pushU8 .empty tagBlock) members.size
+      -- Block hash: encodings collected, concatenated once (appending
+      -- to a growing buffer per member is quadratic in the block size).
+      let mut encs : Array ByteArray := #[]
       let mut unresolvedAll : NameSet := {}
       for n in members do
         let some ci := declMap.get? n | continue
         let (enc, st) ← (memberEncoding localResolve ci).run {}
         for u in st.unresolved do
           unresolvedAll := unresolvedAll.insert u
-        blockBuf := blockBuf ++ enc
+        encs := encs.push enc
+      let total := encs.foldl (fun n e => n + e.size) 0
+      let mut blockBuf := ByteArray.emptyWithCapacity (total + 16)
+      blockBuf := pushNat (pushU8 blockBuf tagBlock) members.size
+      for e in encs do blockBuf := blockBuf ++ e
       let blockId ← sha blockBuf
-      -- Member decl ids, then the table (so sibling refs are exact ids).
+      -- Member decl ids; sibling refs resolve through `memberDecl` first,
+      -- then the table — no per-block copy of the table.
       let mut memberDecl : Std.HashMap Name ByteArray := {}
       for i in [:members.size] do
         let d ← sha (pushNat ((pushU8 .empty tagMember) ++ blockId) i)
         memberDecl := memberDecl.insert members[i]! d
-      let tableWithMembers : RefTable :=
-        memberDecl.fold (fun t n d => t.insert n d) table
       let fullResolve (m : Name) : RefEnc :=
-        match tableWithMembers.get? m with
-        | some r => .id r
-        | none => .byName m
+        match memberDecl.get? m with
+        | some d => .id d
+        | none => match table.get? m with
+          | some r => .id r
+          | none => .byName m
+      -- Compute every member's ids while the resolver (which holds a
+      -- reference to `table`) is alive; insert into the table afterwards.
+      let mut newRefs : Array (Name × ByteArray) := #[]
       for i in [:members.size] do
         let n := members[i]!
         let some ci := declMap.get? n | continue
@@ -603,9 +624,19 @@ def computeIds (decls : Array (Name × ConstantInfo)) (base : RefTable := {})
           name := n, stmt := s, decl := d, ref := r,
           block := some (blockId, i),
           unresolved := unresolvedAll.toArray }
-        tableRef.modify (·.insert n r)
+        newRefs := newRefs.push (n, r)
+      for (n, r) in newRefs do
+        table := table.insert n r
+    if trace then
+      done := done + 1
+      let dt := (← IO.monoMsNow) - tComp
+      if dt > slowest then slowest := dt
+      if dt > 1000 then
+        IO.eprintln s!"refhash: slow component {comp[0]!} (size {comp.size}) {dt} ms"
+      if done % 20000 == 0 then
+        let sm ← shared.get
+        IO.eprintln s!"refhash: {done}/{comps.size} components, {((← IO.monoMsNow) - tStart) / 1000} s, shared memo {sm.size}, slowest {slowest} ms"
 
-  let table ← tableRef.get
   let ordered := decls.filterMap fun (n, _) => results.get? n
   return (ordered, table)
 
