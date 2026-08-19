@@ -38,7 +38,7 @@ Everything lives in the `CA` repository. Downstream projects depend on
 a single package:
 
 ```lean
-require ca from git "https://github.com/marcellop71/CA" @ "main"
+require ca from git "https://github.com/marcellop71/CA" @ "v4.33.0"
 ```
 
 Source tree (items marked *planned* are not yet implemented):
@@ -108,7 +108,7 @@ Project-level metadata. Updated on each `registry generate` run.
 {
   "project": "my-project",
   "url": "https://github.com/user/my-project",
-  "lean_toolchain": "leanprover/lean4:v4.29.0-rc4",
+  "lean_toolchain": "leanprover/lean4:v4.33.0",
   "generated_at": "2026-03-09T12:00:00Z",
   "commit": "abc123...",
   "generator_version": "0.1.0"
@@ -132,7 +132,7 @@ human-readable metadata, status, and dependency information.
     "type_deps": ["e1f2a3...", "b4c5d6..."],
     "value_deps": ["c7d8e9..."],
     "level": 0,
-    "toolchain": "leanprover/lean4:v4.29.0-rc4"
+    "toolchain": "leanprover/lean4:v4.33.0"
   },
   {
     "address": "f8e7d6c5b4a3...",
@@ -144,7 +144,7 @@ human-readable metadata, status, and dependency information.
     "type_deps": ["a1b2c3..."],
     "value_deps": [],
     "level": 0,
-    "toolchain": "leanprover/lean4:v4.29.0-rc4"
+    "toolchain": "leanprover/lean4:v4.33.0"
   },
   {
     "address": "1a2b3c4d5e6f...",
@@ -157,7 +157,7 @@ human-readable metadata, status, and dependency information.
     "type_deps": ["f8e7d6c5b4a3...", "d4e5f6..."],
     "value_deps": [],
     "level": 0,
-    "toolchain": "leanprover/lean4:v4.29.0-rc4"
+    "toolchain": "leanprover/lean4:v4.33.0"
   }
 ]
 ```
@@ -221,7 +221,7 @@ can override it with a project-local `sources.json`.
 
 A project joins the global registry by:
 
-1. Adding `require ca from git "https://github.com/marcellop71/CA" @ "main"`
+1. Adding `require ca from git "https://github.com/marcellop71/CA" @ "v4.33.0"`
    to its `lakefile.lean`.
 2. Annotating declarations with `@[publish]` or `@[open_point]`.
 3. Running `lake exe ca registry generate` to produce `registry/`.
