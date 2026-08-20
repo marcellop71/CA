@@ -10,8 +10,10 @@ require batteries from git
 require Cli from git
   "https://github.com/leanprover/lean4-cli" @ "v4.33.0"
 
+-- Needed only by the `ca` CLI executable (`fetch`/`address` store to
+-- Redis); the CA library never imports it.
 require redisLean from git
-  "https://github.com/marcellop71/redis-lean" @ "main"
+  "https://github.com/marcellop71/redis-lean" @ "v4.33.0-2"
 
 @[default_target]
 lean_lib CA where

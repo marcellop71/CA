@@ -38,7 +38,7 @@ Everything lives in the `CA` repository. Downstream projects depend on
 a single package:
 
 ```lean
-require ca from git "https://github.com/marcellop71/CA" @ "v4.33.0"
+require ca from git "https://github.com/marcellop71/CA" @ "v0.1.0"
 ```
 
 Source tree (items marked *planned* are not yet implemented):
@@ -228,7 +228,7 @@ can override it with a project-local `sources.json`.
 
 A project joins the global registry by:
 
-1. Adding `require ca from git "https://github.com/marcellop71/CA" @ "v4.33.0"`
+1. Adding `require ca from git "https://github.com/marcellop71/CA" @ "v0.1.0"`
    to its `lakefile.lean`.
 2. Annotating declarations with `@[publish]` or `@[open_point]`.
 3. Running `lake exe ca registry generate` to produce `registry/`.

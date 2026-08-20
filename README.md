@@ -145,11 +145,12 @@ In your project's `lakefile.lean`:
 
 ```lean
 require ca from git
-  "https://github.com/marcellop71/CA" @ "v4.33.0"
+  "https://github.com/marcellop71/CA" @ "v0.1.0"
 ```
 
-The tag tracks the Lean toolchain: use the tag matching your
-`lean-toolchain`, or `@ "main"` if you are following development.
+Tags are release versions (the current release builds on Lean
+`v4.33.0`; see `lean-toolchain`); use `@ "main"` if you are following
+development.
 
 Then fetch dependencies:
 
@@ -262,7 +263,7 @@ PR.
 
 ```
 my-project/
-├── lakefile.lean                  # require ca from git "..." @ "v4.33.0"
+├── lakefile.lean                  # require ca from git "..." @ "v0.1.0"
 ├── MyProject/
 │   ├── Definitions.lean           # @[open_point] annotations
 │   └── Theorems.lean              # @[publish] annotations
@@ -480,7 +481,14 @@ lake build ca
 | [lean4-cli](https://github.com/leanprover/lean4-cli) | CLI only | CLI argument parsing |
 | [redis-lean](https://github.com/marcellop71/redis-lean) | CLI only | Redis FFI (hiredis) for `fetch`/`address` commands |
 
-Lean toolchain: `leanprover/lean4:v4.33.0` (see `lean-toolchain`; the
-git tag `v4.33.0` of this repository tracks that toolchain, and
-`batteries` / `Cli` are pinned to the matching releases).
+`redis-lean` is a dependency of the **`ca` CLI executable only** — the
+`fetch` and `address` subcommands use it to store and look up addresses
+in Redis. The `CA` library never imports it, so a downstream project
+that `require`s `ca` fetches the package (Lake has no per-target
+dependencies) but never builds or links it, and needs neither Redis nor
+hiredis installed.
+
+Lean toolchain: `leanprover/lean4:v4.33.0` (see `lean-toolchain`;
+`batteries` / `Cli` are pinned to the matching releases). This
+repository's own tags are release versions (`v0.1.0`, ...).
 
