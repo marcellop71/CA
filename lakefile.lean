@@ -19,7 +19,14 @@ lean_lib CA where
 
 lean_exe "ca" where
   root := `Main
-  moreLinkArgs := #["-lhiredis", "-lhiredis_ssl"]
+  supportInterpreter := true
+  -- supportInterpreter makes undefined symbols fatal at link time, so the
+  -- native deps of the transitive redis-lean/zlog-lean shims must be
+  -- resolved here explicitly.
+  moreLinkArgs := #[
+    "-L/usr/lib/x86_64-linux-gnu", "-lhiredis", "-lhiredis_ssl",
+    "-L/usr/local/lib", "-Wl,-rpath,/usr/local/lib", "-lzlog",
+    "-lssl", "-lcrypto"]
 
 target sha256_shim_o pkg : FilePath := do
   let oFile := pkg.buildDir / "c" / "sha256_shim.o"

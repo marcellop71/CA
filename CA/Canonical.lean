@@ -131,6 +131,35 @@ def canonicalizeL0 (e : Expr) : Expr :=
       let mapping := buildCanonicalUnivMapping params
       canonicalizeExprUnivs e mapping
 
+/-- L0 canonicalization for the expressions of a *declaration* whose
+    universe binder list is `levelParams`: parameters are renamed
+    positionally (`levelParams[i] ↦ u_i`) and `.mdata` is stripped.
+
+    First-occurrence renaming (`canonicalizeL0`) is the right notion for a
+    free-standing expression, but for a declaration it forgets which binder
+    position each parameter occupies — and use sites instantiate levels
+    positionally. Independent first-occurrence renaming made
+    `def q1.{u,v} : F u v` and `def q2.{u,v} : F v u` collide even though
+    `q1.{a,b}` and `q2.{a,b}` have different types (and it lost the
+    type↔value parameter correlation, since the two were renamed
+    independently). Positional renaming keeps identity invariant under
+    renaming the binders while staying sensitive to their order — exactly
+    the α-equivalence of universe-polymorphic declarations.
+
+    Parameters occurring in `e` but missing from `levelParams` (ill-formed
+    input; the kernel would reject it) are appended in first-occurrence
+    order, so the function is total and deterministic. -/
+def canonicalizeL0Decl (levelParams : List Name) (e : Expr) : Expr :=
+  if !e.hasLevelParam then
+    stripMData e
+  else
+    let declared := levelParams.toArray
+    let (_, occurring) := collectExprUnivParams e {} #[]
+    let declaredSet : Std.HashSet Name := declared.foldl (·.insert ·) {}
+    let extra := occurring.filter (!declaredSet.contains ·)
+    let mapping := buildCanonicalUnivMapping (declared ++ extra)
+    canonicalizeExprUnivs e mapping
+
 /-! ## Level 1 Canonicalization (MetaM)
 
 Level 1 extends Level 0 with reducible-transparency normalization via

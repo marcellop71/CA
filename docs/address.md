@@ -28,7 +28,7 @@ Canonicalization transforms an `Expr` so that expressions that differ only in ir
 
 Level 0 is pure (no `MetaM`) and ensures alpha-equivalence:
 
-- **Universe parameter renaming.** Universe parameters are renamed to positional indices (`u_0`, `u_1`, ...) based on first-occurrence order in the expression. This ensures `theorem foo.{u, v} : ...` and `theorem bar.{α, β} : ...` with the same body get the same address.
+- **Universe parameter renaming.** Universe parameters are renamed to positional indices (`u_0`, `u_1`, ...) based on first-occurrence order in the expression. This ensures `theorem foo.{u, v} : ...` and `theorem bar.{α, β} : ...` with the same body get the same address. (`RefHash` instead renames a declaration's parameters positionally from its `levelParams` binder list, which additionally keeps the binder *order* and the type↔value parameter correlation — see [`ref-hash.md`](ref-hash.md).)
 - **Metadata stripping.** `.mdata` annotations are removed. These carry source-location and elaboration metadata that is irrelevant to mathematical content.
 - **Binder names.** Lean 4 `Expr` uses de Bruijn indices for bound variables, so alpha-equivalence is already built in. Binder names do not affect the hash.
 

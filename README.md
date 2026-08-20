@@ -122,6 +122,10 @@ Authors annotate their code with `@[publish]` and `@[open_point]`
 attributes; `#ca_registry` (or `ca registry`) scans the environment,
 computes content addresses, classifies each declaration (proved / open
 / conditional) and writes the registry folder during `lake build`.
+Both paths share one generation core and produce byte-identical
+registries (hashing is a pure-Lean SHA-256, `sha256Pure`, since the
+FFI is unavailable to code interpreted during elaboration); attribute
+descriptions are recorded in `declarations.json`.
 Resolution from the other side — `use`, `resolve%`, and reading other
 projects' registries through `sources.json` — is designed but not yet
 implemented, so today the registry is publishable but not yet
@@ -303,7 +307,8 @@ ca address --name Nat.add_comm
 
 Generates `declarations.json` and `meta.json` from `@[publish]` and
 `@[open_point]` annotations. Standalone alternative to `#ca_registry` for
-environments where the CA binary shares the same toolchain and search paths.
+environments where the CA binary shares the same toolchain and search
+paths — the two produce byte-identical output.
 
 ### `fetch`
 
@@ -324,8 +329,9 @@ for single-declaration lookups.
 
 | Module | Description |
 |--------|-------------|
-| `CA.Canonical` | L0 (pure) and L1 (MetaM) canonicalization |
-| `CA.SHA256` | SHA-256 FFI wrapper (OpenSSL EVP) |
+| `CA.Canonical` | L0 (pure) and L1 (MetaM) canonicalization; positional universe renaming for declarations |
+| `CA.SHA256` | SHA-256 FFI wrapper (OpenSSL EVP) + `sha256Pure` (pure Lean, same digests, for interpreted contexts) |
+| `CA.Base58` | base58btc encode/decode for id rendering |
 | `CA.ExprHash` | Expr serialization, `DeclHash`, name-based and content-based batch hashing |
 | `CA.RefHash` | `stmt` / `decl` / `ref` ids: name-free content identity per declaration (proof-irrelevant references for theorems, value-inclusive otherwise), Merkle-hashed expressions, SCC blocks for mutual/inductive families — see [`docs/ref-hash.md`](docs/ref-hash.md); tests: `lake exe refhash-test` |
 | `CA.Export` | JSON manifest, TSV edge list, summary statistics |
@@ -383,7 +389,10 @@ An address is a hash of a *canonical form*, so the honest question is
 never "is it exact?" but "what does the canonical form erase?".
 
 **Erased by construction (L0).** Binder names (de Bruijn), universe
-parameter names (positional), `mdata` and source positions, the
+parameter names (renamed positionally from the declaration's universe
+binder list — renaming binders is erased, reordering them is not,
+since use sites instantiate levels positionally), `mdata` and source
+positions, the
 declaration's own name, and — because `RefHash` embeds each reference
 by *its* id — the names of everything it refers to, wherever those live
 and however they were later renamed or moved. Two structurally

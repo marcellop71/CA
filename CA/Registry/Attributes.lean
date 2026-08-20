@@ -10,16 +10,21 @@ private def isDefnInfo : ConstantInfo → Bool
   | .defnInfo _ => true
   | _ => false
 
-/-- Parse optional string description from attribute syntax.
-    Handles `@[attr]` and `@[attr "description"]`. -/
-private def parseDescription (stx : Syntax) : AttrM String := do
-  -- stx is the full attribute syntax; children after index 0 are arguments
-  let numArgs := stx.getNumArgs
-  if numArgs <= 1 then return ""
-  let arg := stx[1]!
-  match Syntax.isStrLit? arg with
-  | some s => return s
-  | none => return ""
+/-- Syntax of `@[open_point]` / `@[open_point "description"]`. Without a
+    declared `attr` syntax the parser only accepts the bare identifier
+    form (`Attr.simple`), so the string argument would be a parse error. -/
+syntax (name := open_point) "open_point" (ppSpace str)? : attr
+
+/-- Syntax of `@[publish]` / `@[publish "description"]`. -/
+syntax (name := publish) "publish" (ppSpace str)? : attr
+
+/-- The optional string description of an `@[open_point]`/`@[publish]`
+    attribute application (`stx[0]` is the keyword atom, `stx[1]` the
+    optional string literal). -/
+private def parseDescription (stx : Syntax) : String :=
+  match stx[1].getOptional? with
+  | some lit => (Syntax.isStrLit? lit).getD ""
+  | none => ""
 
 /-- `@[open_point]` or `@[open_point "description"]` — marks a `def X : Prop`
     as an open problem in the formal registry. -/
@@ -36,8 +41,7 @@ initialize registerBuiltinAttribute {
     let ty := ci.type
     unless ty == .sort .zero do
       throwError "@[open_point]: '{name}' must have type Prop, got {ty}"
-    let desc ← parseDescription stx
-    openPointExt.add name { description := desc }
+    openPointExt.add name { description := parseDescription stx }
 }
 
 /-- `@[publish]` or `@[publish "description"]` — marks a theorem or definition
@@ -50,8 +54,7 @@ initialize registerBuiltinAttribute {
     let env ← getEnv
     let some _ := env.find? name
       | throwError "@[publish]: unknown declaration '{name}'"
-    let desc ← parseDescription stx
-    publishExt.add name { description := desc }
+    publishExt.add name { description := parseDescription stx }
 }
 
 end CA.Registry

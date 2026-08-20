@@ -120,6 +120,13 @@ Project-level metadata. Updated on each `registry generate` run.
 Array of published declarations. Each entry contains the content address,
 human-readable metadata, status, and dependency information.
 
+> **Implementation status (2026-08).** The generator today emits
+> `type_hash` (name-based L0 SHA-256; for an `@[open_point]` the hash is
+> of the *statement*, i.e. the `Prop` definition's value), `type_deps`
+> as declaration *names*, and `description`. Address-valued deps,
+> `status_deps`, `value_deps` and the `RefHash` `stmt`/`decl`/`ref` ids
+> shown below are the intended evolution, not yet emitted.
+
 ```json
 [
   {

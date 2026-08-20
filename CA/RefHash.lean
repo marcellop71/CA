@@ -1,4 +1,5 @@
 import Lean
+import CA.Base58
 import CA.Canonical
 import CA.SHA256
 import CA.Util
@@ -27,9 +28,12 @@ stmt(c) = H( STMT ‖ #levelParams ‖ ⟦type c⟧ )
 decl(c) = H( DECL ‖ kind ‖ flags ‖ stmt(c) ‖ ⟦value c⟧? ‖ structural fields )
 ```
 
-where `⟦e⟧` is the **Merkle id** of the L0-canonical expression `e`: each
-node hashes to `H(tag ‖ scalars ‖ ids of children)`, and a `.const r`
-node embeds `ref(r)` — never the name. Merkle hashing (per node, memoised
+where `⟦e⟧` is the **Merkle id** of the L0-canonical expression `e`
+(universes renamed *positionally* from the declaration's `levelParams`
+binder list — use sites instantiate levels positionally, so binder order
+is part of the identity while binder names are not; `mdata` stripped):
+each node hashes to `H(tag ‖ scalars ‖ ids of children)`, and a
+`.const r` node embeds `ref(r)` — never the name. Merkle hashing (per node, memoised
 on structurally-equal subterms) is what makes this tractable on `decide`
 proofs whose *tree* has 10⁸ nodes but whose DAG is small; the flat
 serialisation used by `ExprHash` expands such DAGs into trees.
@@ -160,10 +164,11 @@ abbrev SharedMemo := IO.Ref (Std.HashMap ExprStructEq ByteArray)
 
 private def sharedMemoCap : Nat := 2000000
 
-/-- Per-computation state: the per-declaration memo of subterm ids, the
+/-- Per-computation state: the per-declaration memo of subterm ids (with a
+    flag marking subterms whose hash involved a by-name fallback), the
     optional shared memo, and the names that had to be hashed by name. -/
 structure HashCtx where
-  memo       : Std.HashMap ExprStructEq ByteArray := {}
+  memo       : Std.HashMap ExprStructEq (ByteArray × Bool) := {}
   shared     : Option SharedMemo := none
   unresolved : NameSet := {}
   /-- Number of by-name fallbacks seen so far (to decide whether a
@@ -225,8 +230,16 @@ private def nFlat : UInt8 := 0x2F
     resolver. `resolve` maps a constant name to how it is embedded. -/
 partial def exprId (resolve : Name → RefEnc) (e : Expr) : HashM ByteArray := do
   let key : ExprStructEq := ⟨e⟩
-  if let some h := (← get).memo.get? key then return h
+  if let some (h, dirty) := (← get).memo.get? key then
+    -- A memo hit must re-surface the subterm's fallback status: an
+    -- enclosing window that only sees the cached id would otherwise
+    -- believe the subterm clean and publish itself to the shared memo
+    -- (and a *shared* hit downstream would then under-report
+    -- `unresolved`, breaking "empty means exact").
+    if dirty then modify fun s => { s with fallbacks := s.fallbacks + 1 }
+    return h
   if let some sm := (← get).shared then
+    -- Shared entries are published only when clean, so no flag needed.
     if let some h := (← sm.get).get? key then return h
   let noteRef (r : RefEnc) : HashM Unit := do
     if let .byName n := r then
@@ -270,12 +283,14 @@ partial def exprId (resolve : Name → RefEnc) (e : Expr) : HashM ByteArray := d
       noteRef r
       let hs ← exprId resolve s
       sha ((pushNat (pushRefEnc (pushU8 .empty nProj) r) idx) ++ hs)
-  modify fun st => { st with memo := st.memo.insert key h }
+  let dirty := (← get).fallbacks != fallbacksBefore
+  modify fun st => { st with memo := st.memo.insert key (h, dirty) }
   -- Publish to the shared memo when this subterm involved no by-name
-  -- fallback (its id is final) — leaves and constants included, since
-  -- those are exactly the entries that repeat across declarations.
-  if let some sm := (← get).shared then
-    if (← get).fallbacks == fallbacksBefore then
+  -- fallback anywhere below it (its id is final) — leaves and constants
+  -- included, since those are exactly the entries that repeat across
+  -- declarations.
+  if !dirty then
+    if let some sm := (← get).shared then
       sm.modify fun m => (if m.size > sharedMemoCap then {} else m).insert key h
   return h
 
@@ -321,23 +336,30 @@ def refsOf (ci : ConstantInfo) : NameSet := Id.run do
     | .thmInfo v    => collectConstants v.value acc
     | .opaqueInfo v => collectConstants v.value acc
     | _ => acc
+  -- `v.all` lists the declarations of the surrounding mutual block —
+  -- including the declaration itself, for *every* def/theorem/opaque/
+  -- inductive. The self-entry must be dropped: keeping it made every
+  -- ordinary declaration a self-loop SCC, so everything took the block
+  -- path (`decl = H(MEMBER ‖ block ‖ 0)`), the documented standalone
+  -- encoding was dead code, and the block passes bypassed the shared
+  -- memo. Genuine self-references (e.g. `foo._unsafe_rec` calling
+  -- itself) live in the *value* and are kept by `collectConstants` —
+  -- those singletons still form self-loop SCCs, as intended.
+  let notSelf (ns : List Name) : List Name := ns.filter (· != ci.name)
   let acc : NameSet := match ci with
-    | .inductInfo v => ins acc (v.ctors ++ v.all)
+    | .inductInfo v => ins acc (v.ctors ++ notSelf v.all)
     | .ctorInfo v   => acc.insert v.induct
     | .recInfo v    =>
       v.rules.foldl (fun (a : NameSet) r => collectConstants r.rhs (a.insert r.ctor)) (ins acc v.all)
-    | .defnInfo v   => ins acc v.all
-    | .opaqueInfo v => ins acc v.all
-    | .thmInfo v    => ins acc v.all
+    | .defnInfo v   => ins acc (notSelf v.all)
+    | .opaqueInfo v => ins acc (notSelf v.all)
+    | .thmInfo v    => ins acc (notSelf v.all)
     | _ => acc
-  -- Keep a self-reference (e.g. `foo._unsafe_rec` calls itself): it is
-  -- what makes the singleton a self-loop SCC, hashed with a block-local
-  -- reference instead of falling back to the name.
   return acc
 
 /-- Statement encoding: `#levelParams ‖ ⟦type⟧`. -/
 private def stmtHash (resolve : Name → RefEnc) (ci : ConstantInfo) : HashM ByteArray := do
-  let ht ← exprId resolve (canonicalizeL0 ci.type)
+  let ht ← exprId resolve (canonicalizeL0Decl ci.levelParams ci.type)
   sha ((pushNat (pushU8 .empty tagStmt) ci.levelParams.length) ++ ht)
 
 /-- The kind-specific tail of the declaration encoding: value (if any)
@@ -349,13 +371,13 @@ private def declTail (resolve : Name → RefEnc) (ci : ConstantInfo) : HashM Byt
   | .axiomInfo v =>
     return pushU8 .empty (if v.isUnsafe then 1 else 0)
   | .defnInfo v =>
-    let hv ← exprId resolve (canonicalizeL0 v.value)
+    let hv ← exprId resolve (canonicalizeL0Decl v.levelParams v.value)
     return (pushU8 .empty (safetyTag v.safety)) ++ hv
   | .thmInfo v =>
-    let hv ← exprId resolve (canonicalizeL0 v.value)
+    let hv ← exprId resolve (canonicalizeL0Decl v.levelParams v.value)
     return hv
   | .opaqueInfo v =>
-    let hv ← exprId resolve (canonicalizeL0 v.value)
+    let hv ← exprId resolve (canonicalizeL0Decl v.levelParams v.value)
     return (pushU8 .empty (if v.isUnsafe then 1 else 0)) ++ hv
   | .quotInfo v =>
     return pushU8 .empty (quotKindTag v.kind)
@@ -385,7 +407,7 @@ private def declTail (resolve : Name → RefEnc) (ci : ConstantInfo) : HashM Byt
     for r in v.rules do
       b := b ++ refBytes r.ctor
       b := pushNat b r.nfields
-      b := b ++ (← exprId resolve (canonicalizeL0 r.rhs))
+      b := b ++ (← exprId resolve (canonicalizeL0Decl v.levelParams r.rhs))
     return b
 
 /-- Full member encoding used inside a block hash and for standalone
@@ -646,20 +668,8 @@ def idsOf (name : Name) (ci : ConstantInfo) (base : RefTable) : IO DeclIds := do
   let (r, _) ← computeIds #[(name, ci)] base
   return r[0]!
 
-/-- base58btc rendering, so ids print like the existing CA hashes. -/
-def toB58 (b : ByteArray) : String := Id.run do
-  let alphabet := "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".toList.toArray
-  if b.size == 0 then return ""
-  let mut zeros := 0
-  for i in [:b.size] do
-    if b.get! i == 0 then zeros := zeros + 1 else break
-  let mut n : Nat := 0
-  for i in [:b.size] do
-    n := n * 256 + (b.get! i).toNat
-  let mut digits : Array Char := #[]
-  while n > 0 do
-    digits := digits.push alphabet[n % 58]!
-    n := n / 58
-  return String.ofList (List.replicate zeros '1' ++ digits.reverse.toList)
+/-- base58btc rendering, so ids print like the existing CA hashes.
+    (Alias for `CA.Base58.encode`.) -/
+def toB58 (b : ByteArray) : String := CA.Base58.encode b
 
 end CA.RefHash

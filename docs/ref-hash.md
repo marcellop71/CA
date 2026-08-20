@@ -27,8 +27,14 @@ stmt(c) = H( STMT ‖ #levelParams ‖ ⟦type c⟧ )
 decl(c) = H( DECL ‖ kind ‖ flags ‖ stmt(c) ‖ ⟦value c⟧? ‖ structural fields )
 ```
 
-`⟦e⟧` is the id of the L0-canonical expression `e` (universes
-canonicalised, `mdata` stripped), computed **Merkle-style**: a node's id
+`⟦e⟧` is the id of the L0-canonical expression `e` (`mdata` stripped;
+universe parameters renamed **positionally** from the declaration's
+`levelParams` binder list, `levelParams[i] ↦ u_i` — renaming the
+binders is erased, *reordering* them is not, because use sites
+instantiate levels positionally: `def q1.{u,v} : F u v` and
+`def q2.{u,v} : F v u` are different declarations and get different
+ids, where per-expression first-occurrence renaming made them collide),
+computed **Merkle-style**: a node's id
 is `H(tag ‖ scalars ‖ ids of children)`, and a `.const r` node embeds
 `ref(r)`. Shallow subterms (`approxDepth ≤ 6`) are hashed flat in one
 SHA-256; deeper ones from their children with a memo on structurally
@@ -74,7 +80,10 @@ level-param count and the canonical universe naming.
 `computeIds decls base` resolves references to constants outside
 `decls` through `base : RefTable` (name → ref). Anything in neither is
 hashed **by name** and reported in `DeclIds.unresolved`; such ids are
-*not* exact and never enter the shared memo. To get exact ids for a
+*not* exact and never enter the shared memo — subterm memo entries
+carry a dirty flag so that a cached fallback-bearing subterm still
+poisons every enclosing term (and `unresolved` stays complete even
+when a term is served from the cross-declaration memo). To get exact ids for a
 subset (e.g. one library on top of another), compute the base first —
 `computeIds` over `Init` yields 0 unresolved.
 
@@ -98,10 +107,16 @@ CA.RefHash.toB58      : ByteArray → String
 * definitions: same type ⇒ same `stmt`; different value ⇒ different
   `decl`/`ref`, and statements *about* them differ accordingly;
 * mutual / inductive blocks share a block id with distinct indices;
+* universe binder *order* is part of the identity (positional
+  instantiation), binder *names* are not;
+* ordinary (non-mutual, non-self-referential) declarations are
+  standalone — no block id;
+* `unresolved` is complete even for subterms served from the shared
+  memo;
 * deterministic, input-order independent; 0 unresolved on `Init`.
 
-Throughput: ~500–600 declarations/s single-threaded on `Init`
-(66k declarations, ~2 min); SCC levels are independent, so this
+Throughput: ~3.5k declarations/s single-threaded on `Init`
+(66k declarations, ~18 s); SCC levels are independent, so this
 parallelises when needed.
 
 ## What declbuild / declregistry do with it (plan)
