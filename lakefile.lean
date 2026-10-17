@@ -30,12 +30,19 @@ lean_exe "ca" where
     "-L/usr/local/lib", "-Wl,-rpath,/usr/local/lib", "-lzlog",
     "-lssl", "-lcrypto"]
 
+/-- Compile `src` into `oFile` with a build trace over `src` and `deps` (local headers,
+    `#include`d `.c` files), so editing any of them rebuilds the object and the archives
+    that use it. `weakArgs` (include paths) are kept out of the trace. -/
+def tracedO (oFile src : FilePath) (deps : Array FilePath := #[])
+    (weakArgs traceArgs : Array String := #[]) : SpawnM (Job FilePath) := do
+  let inputs ← (#[src] ++ deps).mapM inputTextFile
+  let srcJob ← (Job.collectArray inputs).mapM fun _ => pure src
+  buildO oFile srcJob weakArgs traceArgs
+
 target sha256_shim_o pkg : FilePath := do
-  let oFile := pkg.buildDir / "c" / "sha256_shim.o"
-  IO.FS.createDirAll oFile.parent.get!
-  compileO oFile (pkg.dir / "CA" / "sha256" / "sha256_shim.c")
-    #["-fPIC", "-O2", "-I", (← getLeanIncludeDir).toString]
-  return .pure oFile
+  tracedO (pkg.buildDir / "c" / "sha256_shim.o") (pkg.dir / "CA" / "sha256" / "sha256_shim.c")
+    (weakArgs := #["-I", (← getLeanIncludeDir).toString])
+    (traceArgs := #["-fPIC", "-O2"])
 
 extern_lib libsha256_shim pkg := do
   let obj ← sha256_shim_o.fetch
