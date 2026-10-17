@@ -145,11 +145,11 @@ In your project's `lakefile.lean`:
 
 ```lean
 require ca from git
-  "https://github.com/marcellop71/CA" @ "v0.1.0"
+  "https://github.com/marcellop71/CA" @ "v0.2.0"
 ```
 
 Tags are release versions (the current release builds on Lean
-`v4.33.0`; see `lean-toolchain`); use `@ "main"` if you are following
+`v4.35.0`; see `lean-toolchain`); use `@ "main"` if you are following
 development.
 
 Then fetch dependencies:
@@ -448,7 +448,7 @@ lake build ca  # build the CLI executable (requires Redis native libs)
 ```
 
 The Nix flake provides the Lean 4 release binary pinned to the same
-version as `lean-toolchain` (v4.33.0; x86_64 and aarch64, Linux and
+version as `lean-toolchain` (v4.35.0; x86_64 and aarch64, Linux and
 macOS), OpenSSL for the library, and hiredis + zlog for the CLI's
 redis-lean / zlog-lean shims. When bumping the toolchain, bump
 `leanVersion` and the four tarball hashes in `flake.nix` together (the
@@ -492,7 +492,7 @@ that `require`s `ca` fetches the package (Lake has no per-target
 dependencies) but never builds or links it, and needs neither Redis nor
 hiredis installed.
 
-Lean toolchain: `leanprover/lean4:v4.33.0` (see `lean-toolchain`;
+Lean toolchain: `leanprover/lean4:v4.35.0` (see `lean-toolchain`;
 `batteries` / `Cli` are pinned to the matching releases). This
-repository's own tags are release versions (`v0.1.0`, ...).
+repository's own tags are release versions (`v0.1.0`, `v0.2.0`, ...).
 

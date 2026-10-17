@@ -108,7 +108,7 @@ Project-level metadata. Updated on each `registry generate` run.
 {
   "project": "my-project",
   "url": "https://github.com/user/my-project",
-  "lean_toolchain": "leanprover/lean4:v4.33.0",
+  "lean_toolchain": "leanprover/lean4:v4.35.0",
   "generated_at": "2026-03-09T12:00:00Z",
   "commit": "abc123...",
   "generator_version": "0.1.0"
@@ -139,7 +139,7 @@ human-readable metadata, status, and dependency information.
     "type_deps": ["e1f2a3...", "b4c5d6..."],
     "value_deps": ["c7d8e9..."],
     "level": 0,
-    "toolchain": "leanprover/lean4:v4.33.0"
+    "toolchain": "leanprover/lean4:v4.35.0"
   },
   {
     "address": "f8e7d6c5b4a3...",
@@ -151,7 +151,7 @@ human-readable metadata, status, and dependency information.
     "type_deps": ["a1b2c3..."],
     "value_deps": [],
     "level": 0,
-    "toolchain": "leanprover/lean4:v4.33.0"
+    "toolchain": "leanprover/lean4:v4.35.0"
   },
   {
     "address": "1a2b3c4d5e6f...",
@@ -164,7 +164,7 @@ human-readable metadata, status, and dependency information.
     "type_deps": ["f8e7d6c5b4a3...", "d4e5f6..."],
     "value_deps": [],
     "level": 0,
-    "toolchain": "leanprover/lean4:v4.33.0"
+    "toolchain": "leanprover/lean4:v4.35.0"
   }
 ]
 ```

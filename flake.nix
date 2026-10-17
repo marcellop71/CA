@@ -12,12 +12,12 @@
         pkgs = nixpkgs.legacyPackages.${system};
 
         # Lean 4 release binary. Keep `leanVersion` equal to
-        # `lean-toolchain` (leanprover/lean4:v4.33.0) and refresh the
+        # `lean-toolchain` (leanprover/lean4:v4.35.0) and refresh the
         # four hashes together:
         #   curl -sL https://github.com/leanprover/lean4/releases/download/v$V/lean-$V-$P.tar.zst \
         #     | sha256sum | cut -d' ' -f1 | xxd -r -p | base64      # → sha256-…
         # (or `nix hash file` on the downloaded tarball).
-        leanVersion = "4.33.0";
+        leanVersion = "4.35.0";
         leanPlatform = {
           "x86_64-linux"   = "linux";
           "aarch64-linux"  = "linux_aarch64";
@@ -25,10 +25,10 @@
           "aarch64-darwin" = "darwin_aarch64";
         }.${system} or (throw "CA: no Lean release tarball for ${system}");
         leanSha256 = {
-          "linux"          = "sha256-Sz+wPCmh4KJT+x0R+brjcl8ZoNxvwJs+oW0snfM0niw=";
-          "linux_aarch64"  = "sha256-+WGkF8uhC26gqdE2cS1ZUoE4F//WaABB8JojNSb4A6k=";
-          "darwin"         = "sha256-GMSt/S5FOMNmj34HDojHohV23un730beffLvFsl//vM=";
-          "darwin_aarch64" = "sha256-21J0tmm+JwrwSLXk8eDOVx32dQ5BGVaz4eb8wgEkEMI=";
+          "linux"          = "sha256-colZekRUMkbJInuMrlAXZ+CVzhf21Ei5X8So3Jcmj20=";
+          "linux_aarch64"  = "sha256-yPD4o5IOg5cYsTQ+Z4H9gKPpsQJPvNcHjrMPVOgGsCg=";
+          "darwin"         = "sha256-C0O+XH7Ps2AWVmpBAFq2K9sEdD5r/Vg35F95bvR1C04=";
+          "darwin_aarch64" = "sha256-wMbzTzW6HcxcSl/RBv76uetehGlxJiTdLIaNUbYxd8I=";
         }.${leanPlatform};
 
         lean4Bin = pkgs.stdenv.mkDerivation {

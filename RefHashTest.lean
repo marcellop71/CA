@@ -105,7 +105,7 @@ def main : IO UInt32 := do
     if ok then IO.println s!"  ✓ {label}"
     else IO.println s!"  ✗ {label}"
   let mut fails : Array String := #[]
-  let assert (label : String) (ok : Bool) : IO (Array String) := do
+  let check (label : String) (ok : Bool) : IO (Array String) := do
     check label ok
     return if ok then #[] else #[label]
 
@@ -118,40 +118,40 @@ def main : IO UInt32 := do
   let T ← get `T; let Ta ← get `T.a; let Tb ← get `T.b; let Trec ← get `T.rec
   let T2 ← get `T2
 
-  fails := fails ++ (← assert "no unresolved references with a complete base"
+  fails := fails ++ (← check "no unresolved references with a complete base"
     (ids.all (·.unresolved.isEmpty)))
-  fails := fails ++ (← assert "A, B : Type share a statement id" (A.stmt == B.stmt))
-  fails := fails ++ (← assert "A, B : Type have different decl ids" (A.decl != B.decl))
-  fails := fails ++ (← assert "f, g (α-renamed) have equal decl ids — names never enter"
+  fails := fails ++ (← check "A, B : Type share a statement id" (A.stmt == B.stmt))
+  fails := fails ++ (← check "A, B : Type have different decl ids" (A.decl != B.decl))
+  fails := fails ++ (← check "f, g (α-renamed) have equal decl ids — names never enter"
     (f.decl == g.decl && f.ref == g.ref))
-  fails := fails ++ (← assert "f, h: same type ⇒ same stmt" (f.stmt == h.stmt))
-  fails := fails ++ (← assert "f, h: different value ⇒ different decl and ref"
+  fails := fails ++ (← check "f, h: same type ⇒ same stmt" (f.stmt == h.stmt))
+  fails := fails ++ (← check "f, h: different value ⇒ different decl and ref"
     (f.decl != h.decl && f.ref != h.ref))
-  fails := fails ++ (← assert "t1, t2: same statement ⇒ same stmt and ref (proof irrelevance)"
+  fails := fails ++ (← check "t1, t2: same statement ⇒ same stmt and ref (proof irrelevance)"
     (t1'.stmt == t2'.stmt && t1'.ref == t2'.ref))
-  fails := fails ++ (← assert "t1, t2: different proofs ⇒ different decl" (t1'.decl != t2'.decl))
-  fails := fails ++ (← assert "uses_f, uses_g: statements about equal content are equal"
+  fails := fails ++ (← check "t1, t2: different proofs ⇒ different decl" (t1'.decl != t2'.decl))
+  fails := fails ++ (← check "uses_f, uses_g: statements about equal content are equal"
     (uf.stmt == ug.stmt))
-  fails := fails ++ (← assert "uses_f, uses_h: statements about different content differ"
+  fails := fails ++ (← check "uses_f, uses_h: statements about different content differ"
     (uf.stmt != uh.stmt))
-  fails := fails ++ (← assert "ordinary defs and theorems are standalone (no block)"
+  fails := fails ++ (← check "ordinary defs and theorems are standalone (no block)"
     (f.block.isNone && t1'.block.isNone && A.block.isNone))
-  fails := fails ++ (← assert "ev, od form one block with distinct indices"
+  fails := fails ++ (← check "ev, od form one block with distinct indices"
     (match ev.block, od.block with
      | some (b1, i1), some (b2, i2) => b1 == b2 && i1 != i2
      | _, _ => false))
-  fails := fails ++ (← assert "T, T.a, T.b form one block (the SCC); T.rec is a downstream node"
+  fails := fails ++ (← check "T, T.a, T.b form one block (the SCC); T.rec is a downstream node"
     (match T.block, Ta.block, Tb.block with
      | some (b, _), some (b1, _), some (b2, _) => b == b1 && b1 == b2 && Trec.block.isNone
      | _, _, _ => false))
-  fails := fails ++ (← assert "T, T2 (α-renamed inductives) have equal decl ids" (T.decl == T2.decl))
-  fails := fails ++ (← assert "T.a ≠ T.b" (Ta.decl != Tb.decl))
+  fails := fails ++ (← check "T, T2 (α-renamed inductives) have equal decl ids" (T.decl == T2.decl))
+  fails := fails ++ (← check "T.a ≠ T.b" (Ta.decl != Tb.decl))
 
   -- Universe binder list: order is identity, names are not.
   let q1' ← get `q1; let q2' ← get `q2; let q3' ← get `q3
-  fails := fails ++ (← assert "q1, q3 (universe binders renamed) have equal ids"
+  fails := fails ++ (← check "q1, q3 (universe binders renamed) have equal ids"
     (q1'.stmt == q3'.stmt && q1'.decl == q3'.decl))
-  fails := fails ++ (← assert "q1, q2 (universe binders permuted) differ — instantiation is positional"
+  fails := fails ++ (← check "q1, q2 (universe binders permuted) differ — instantiation is positional"
     (q1'.stmt != q2'.stmt && q1'.decl != q2'.decl))
 
   -- Unresolved reporting must survive the shared memo: with an empty base
@@ -163,13 +163,13 @@ def main : IO UInt32 := do
   let (wIds, _) ← computeIds (pick [`w1, `w2]) {}
   let wOk := wIds.size == 2 &&
     wIds.all (fun d => d.unresolved.contains `Nat && d.unresolved.contains `HMul.hMul)
-  fails := fails ++ (← assert "unresolved is complete across shared-memo hits (w1, w2)" wOk)
+  fails := fails ++ (← check "unresolved is complete across shared-memo hits (w1, w2)" wOk)
 
   -- Determinism: recompute and compare every id.
   let (ids2, _) ← computeIds ours base
   let same := ids.size == ids2.size &&
     (ids.zip ids2).all fun (a, b) => a.name == b.name && a.stmt == b.stmt && a.decl == b.decl && a.ref == b.ref
-  fails := fails ++ (← assert "deterministic across runs" same)
+  fails := fails ++ (← check "deterministic across runs" same)
 
   -- Order independence: reversed input yields the same ids.
   let (ids3, _) ← computeIds ours.reverse base
@@ -177,7 +177,7 @@ def main : IO UInt32 := do
   let sameOrder := ids.all fun d => match m3.get? d.name with
     | some d3 => d3.stmt == d.stmt && d3.decl == d.decl
     | none => false
-  fails := fails ++ (← assert "input order does not matter" sameOrder)
+  fails := fails ++ (← check "input order does not matter" sameOrder)
 
   -- Pure SHA-256 agrees with the FFI implementation.
   let vectors : Array ByteArray := #[
@@ -186,9 +186,9 @@ def main : IO UInt32 := do
   let mut shaOk := true
   for v in vectors do
     if (← CA.SHA256.sha256 v) != CA.SHA256.sha256Pure v then shaOk := false
-  fails := fails ++ (← assert "sha256Pure matches FFI sha256 on test vectors" shaOk)
+  fails := fails ++ (← check "sha256Pure matches FFI sha256 on test vectors" shaOk)
   let abcHex := CA.SHA256.toHex256 (CA.SHA256.sha256Pure "abc".toUTF8)
-  fails := fails ++ (← assert "sha256Pure(\"abc\") matches the FIPS vector"
+  fails := fails ++ (← check "sha256Pure(\"abc\") matches the FIPS vector"
     (abcHex == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"))
 
   IO.println ""

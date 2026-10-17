@@ -5,15 +5,15 @@ package "ca" where
   moreLinkArgs := #["-Wl,--allow-shlib-undefined", "-lssl", "-lcrypto"]
 
 require batteries from git
-  "https://github.com/leanprover-community/batteries" @ "v4.33.0"
+  "https://github.com/leanprover-community/batteries" @ "v4.35.0"
 
 require Cli from git
-  "https://github.com/leanprover/lean4-cli" @ "v4.33.0"
+  "https://github.com/leanprover/lean4-cli" @ "v4.35.0"
 
 -- Needed only by the `ca` CLI executable (`fetch`/`address` store to
 -- Redis); the CA library never imports it.
 require redisLean from git
-  "https://github.com/marcellop71/redis-lean" @ "v4.33.0-2"
+  "https://github.com/marcellop71/redis-lean" @ "v4.35.0"
 
 @[default_target]
 lean_lib CA where
