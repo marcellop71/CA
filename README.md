@@ -1,3 +1,7 @@
+> **Moved.** CA now lives at **[github.com/proofinity-it/CA](https://github.com/proofinity-it/CA)**
+> (from `v0.3.0`). This repository is kept for its history and the paper;
+> use the new one in `require ca from git`.
+
 # CA — Content-Addressing for Lean 4
 
 ### Warning: this is an early prototype, still subject to conceptual and implementation flaws and API churn.
